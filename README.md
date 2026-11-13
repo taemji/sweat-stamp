@@ -16,7 +16,7 @@
 - **Framework**: Next.js 16 App Router
 - **UI**: React 19, Tailwind CSS 4, shadcn/ui, Radix UI, Base UI
 - **Icons**: Lucide React
-- **Persistence**: LocalStorage, IndexedDB
+- **Persistence**: Supabase Postgres, Supabase Storage
 - **Testing**: Vitest, Testing Library, Playwright
 - **Package manager**: Bun
 
@@ -65,7 +65,21 @@ $env:LAN_IP="192.168.1.167"; bun run dev:https
 
 ## 기록 저장
 
-운동명과 완료 상태는 LocalStorage에, 인증 사진은 IndexedDB에 저장합니다. 현재는 한 기기의 한 브라우저 안에서만 기록이 유지됩니다. 여러 기기 동기화는 이후 서버 저장소를 연결해야 합니다.
+Supabase가 설정되면 운동 인증은 Postgres에, 스탬프 사진은 `certification-photos` Storage bucket에 저장되어 여러 기기에서 함께 보입니다. Supabase가 설정되지 않았거나 연결할 수 없으면 기존 LocalStorage와 IndexedDB 저장으로 자동 전환됩니다.
+
+### Supabase 설정
+
+1. Supabase SQL Editor에서 [supabase/migrations/202611130001_create_certifications.sql](./supabase/migrations/202611130001_create_certifications.sql) 전체를 실행합니다.
+2. `.env.example`을 참고해 로컬 `.env.local`과 Vercel에 아래 Config 값을 등록합니다.
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
+```
+
+3. Vercel에서 새 배포를 실행합니다. 앱 헤더에 `공동 저장`이 표시되면 연결된 상태입니다. `공동 저장 오류 · 로컬 저장`이 보이면 SQL 마이그레이션과 Data API 설정을 확인합니다.
+
+이 MVP는 로그인 없이 네 멤버가 사용하는 구조라 RLS가 멤버 ID, 날짜, 파일 경로와 형식을 제한합니다. 공개 배포 후 쓰기 권한을 더 강하게 보호하려면 멤버별 PIN 또는 Supabase Auth를 추가해야 합니다.
 
 ## 스크립트
 
@@ -92,4 +106,6 @@ bunx playwright install chromium
 - [components/sweat-stamp-app.tsx](./components/sweat-stamp-app.tsx): 4인 사진 인증 플로우
 - [lib/member-profiles.ts](./lib/member-profiles.ts): 사람별 이름, 색상, 캐릭터 설정
 - [lib/certification-photo-store.ts](./lib/certification-photo-store.ts): IndexedDB 사진 저장
+- [lib/shared-certifications.ts](./lib/shared-certifications.ts): Supabase 공동 인증 저장
+- [supabase/migrations](./supabase/migrations): 테이블, Storage, RLS 정책
 - [CLAUDE.md](./CLAUDE.md), [AGENTS.md](./AGENTS.md): 저장소 작업 규칙과 아키텍처 지침

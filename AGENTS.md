@@ -6,9 +6,9 @@ These instructions apply to the entire repository. Project-specific instructions
 
 ## Project Snapshot
 
-This is a mobile-first Sweat Stamp photo certification app built with Next.js 16 App Router, React 19, Tailwind CSS 4, shadcn/ui, Radix/Base UI, Lucide icons, IndexedDB, Vitest, Testing Library, and Playwright. The package manager is Bun.
+This is a mobile-first Sweat Stamp photo certification app built with Next.js 16 App Router, React 19, Tailwind CSS 4, shadcn/ui, Radix/Base UI, Lucide icons, Supabase Postgres/Storage, Vitest, Testing Library, and Playwright. The package manager is Bun.
 
-`README.md` is the user-facing project overview. The current product is a Korean-language workout certification app for taem, saem, yum, and ssuk. Each member has an independent theme, character, routine, photo, and daily completion state.
+`README.md` is the user-facing project overview. The current product is a Korean-language workout certification app for taem, sam, sook, and yoom. Each member has an independent theme, character, routine, photo, and daily completion state.
 
 ## Start Here
 
@@ -25,25 +25,27 @@ This is a mobile-first Sweat Stamp photo certification app built with Next.js 16
 - Follow the existing visual system in `app/globals.css`: member theme tokens, a Korean system font stack, compact panels, and person-specific accents.
 - Prefer Lucide icons for actions and existing shadcn/ui components for controls.
 - Preserve accessibility affordances already present: semantic headings, labels, `aria-live` where useful, and role/name-friendly controls for Playwright tests.
-- Camera capture and IndexedDB are browser/device capabilities. Keep album selection and storage failure paths working.
+- Camera capture, Supabase, and IndexedDB fallback are runtime capabilities. Keep album selection, remote errors, and local fallback paths working.
 
 ## Architecture Map
 
 - `app/page.tsx` should remain a thin App Router entry that renders `SweatStampApp`.
 - `app/layout.tsx` owns metadata, Korean HTML language, and the theme provider.
-- `components/sweat-stamp-app.tsx` owns member selection, routines, photo selection, completion, and local persistence coordination.
+- `components/sweat-stamp-app.tsx` owns member selection, routines, photo selection, completion, and shared/local persistence coordination.
 - `components/ui/*` contains shadcn-generated primitives. Do not edit these directly unless the task is explicitly about the primitive itself; prefer variants, semantic tokens, CSS variables, or wrapper composition.
 - `lib/member-profiles.ts` is the single source for member IDs, display names, colors, character variants, and screen copy.
+- `lib/shared-certifications.ts` owns Supabase table and Storage operations.
 - `lib/certification-photo-store.ts` owns IndexedDB photo persistence. Keep browser failure handling and database upgrades backward compatible.
+- `supabase/migrations/*` owns the Postgres schema, Storage bucket, grants, and RLS policies.
 - `app/icon.svg` is the product icon. If it changes, check `app/manifest.ts` at the same time.
 
 Respect the dependency direction in `CLAUDE.md`: lower-level modules should not import higher-level modules. In this repo, `lib` must not depend on `components` or `app`; shared logic belongs in `lib`.
 
 ## Data And Runtime Notes
 
-- Routine text and certification metadata are stored in LocalStorage.
-- Certification photos are stored in the `sweat-stamp` IndexedDB database.
-- Data is currently device- and browser-local; do not imply cross-device sync in UI copy.
+- Shared certifications are stored in Supabase when public configuration is available and the schema is applied.
+- LocalStorage and the `sweat-stamp` IndexedDB database are the offline/unconfigured fallback.
+- Public keys may use `NEXT_PUBLIC_`; database passwords, secret keys, and service-role keys must never be committed or exposed to the browser.
 - Do not commit secrets or real credentials.
 
 ## Commands

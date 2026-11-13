@@ -17,6 +17,7 @@ test.beforeEach(async ({ page }) => {
 test("home opens the shared calendar before member screens", async ({ page }) => {
   await expect(page).toHaveTitle("Sweat Stamp");
   await expect(page.getByRole("heading", { name: "Sweat Stamp" })).toBeVisible();
+  await expect(page.getByText(/이 기기에 저장/)).toBeVisible();
   await expect(page.getByRole("button", { name: "전체 캘린더" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("공동 인증 캘린더")).toBeVisible();
   await expect(page.getByRole("button", { name: "이전 달" })).toBeVisible();

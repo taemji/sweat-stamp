@@ -36,12 +36,22 @@ import {
   migrateMemberRecord,
   migrateSelectedMemberId,
 } from "@/lib/member-id-migration";
+import {
+  deleteSharedCertification,
+  getSharedPhotoUrl,
+  loadSharedCertifications,
+  saveSharedCertification,
+  subscribeToSharedCertifications,
+  type SharedCertification,
+} from "@/lib/shared-certifications";
 import { createStampedPhoto, formatStampDateTime } from "@/lib/stamp-photo";
+import { isSupabaseConfigured } from "@/lib/supabase-client";
 
 interface Certification {
   completedAt: string;
   memberId: MemberId;
   photoName: string;
+  photoPath?: string;
   routine: string;
 }
 
@@ -50,6 +60,7 @@ type StoredCertification = Omit<Certification, "memberId"> & { memberId: string 
 type CertificationMap = Record<string, Certification>;
 type RoutineMap = Partial<Record<MemberId, string>>;
 type AppView = "calendar" | MemberId;
+type SyncStatus = "connecting" | "error" | "local" | "shared";
 
 const selectedMemberStorageKey = "sweat-stamp:selected-member";
 const routinesStorageKey = "sweat-stamp:routines";
@@ -66,6 +77,19 @@ function readStoredObject<T extends object>(key: string): T | null {
   } catch {
     return null;
   }
+}
+
+function mapSharedCertificationRecords(sharedCertifications: SharedCertification[]) {
+  return Object.fromEntries(sharedCertifications.map((certification) => [
+    getCertificationKey(certification.memberId, certification.workoutDate),
+    {
+      completedAt: certification.completedAt,
+      memberId: certification.memberId,
+      photoName: certification.photoPath.split("/").at(-1) ?? "workout-stamped.jpg",
+      photoPath: certification.photoPath,
+      routine: certification.routine,
+    } satisfies Certification,
+  ]));
 }
 
 interface CalendarOverviewProps {
@@ -164,6 +188,7 @@ function CalendarOverview({
 }
 
 export function SweatStampApp() {
+  const usesSharedStorage = isSupabaseConfigured();
   const [activeView, setActiveView] = useState<AppView>("calendar");
   const [selectedMemberId, setSelectedMemberId] = useState<MemberId>("taem");
   const [visibleMonth, setVisibleMonth] = useState(() => {
@@ -178,6 +203,7 @@ export function SweatStampApp() {
   const [saveError, setSaveError] = useState("");
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(usesSharedStorage ? "connecting" : "local");
   const [hasHydrated, setHasHydrated] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -191,6 +217,13 @@ export function SweatStampApp() {
     day: "numeric",
     weekday: "short",
   }).format(new Date());
+  const syncStatusText = syncStatus === "shared"
+    ? "공동 저장"
+    : syncStatus === "connecting"
+      ? "연결 중"
+      : syncStatus === "error"
+        ? "공동 저장 오류 · 로컬 저장"
+        : "이 기기에 저장";
   const canCertify = routine.trim().length > 0 && routineChecked && photoPreview !== null;
   const isCalendarView = activeView === "calendar";
   const themeStyle = {
@@ -201,6 +234,7 @@ export function SweatStampApp() {
   } as CSSProperties;
 
   useEffect(() => {
+    let isActive = true;
     const frameId = window.requestAnimationFrame(async () => {
       const storedMemberId = window.localStorage.getItem(selectedMemberStorageKey);
       const storedRoutines = readStoredObject<Record<string, string>>(routinesStorageKey);
@@ -219,14 +253,37 @@ export function SweatStampApp() {
 
       if (storedCertifications) {
         await migrateCertificationPhotoKeys(getLegacyPhotoKeys(Object.keys(migratedCertifications))).catch(() => undefined);
-        setCertifications(migratedCertifications);
       }
+
+      let nextCertifications = migratedCertifications;
+
+      if (usesSharedStorage) {
+        try {
+          nextCertifications = mapSharedCertificationRecords(await loadSharedCertifications());
+          if (isActive) {
+            setSyncStatus("shared");
+          }
+        } catch {
+          if (isActive) {
+            setSyncStatus("error");
+          }
+        }
+      }
+
+      if (!isActive) {
+        return;
+      }
+
+      setCertifications(nextCertifications);
 
       setHasHydrated(true);
     });
 
-    return () => window.cancelAnimationFrame(frameId);
-  }, []);
+    return () => {
+      isActive = false;
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [usesSharedStorage]);
 
   useEffect(() => {
     if (!hasHydrated) {
@@ -237,6 +294,18 @@ export function SweatStampApp() {
     window.localStorage.setItem(routinesStorageKey, JSON.stringify(routines));
     window.localStorage.setItem(certificationsStorageKey, JSON.stringify(certifications));
   }, [certifications, hasHydrated, routines, selectedMemberId]);
+
+  useEffect(() => {
+    if (syncStatus !== "shared") {
+      return;
+    }
+
+    return subscribeToSharedCertifications(() => {
+      void loadSharedCertifications()
+        .then((sharedCertifications) => setCertifications(mapSharedCertificationRecords(sharedCertifications)))
+        .catch(() => setSyncStatus("error"));
+    }) ?? undefined;
+  }, [syncStatus]);
 
   useEffect(() => {
     return () => {
@@ -252,6 +321,19 @@ export function SweatStampApp() {
 
     if (!completedCertification) {
       return;
+    }
+
+    if (completedCertification.photoPath && syncStatus === "shared") {
+      const remotePhotoUrl = getSharedPhotoUrl(completedCertification.photoPath, completedCertification.completedAt);
+      void Promise.resolve().then(() => {
+        if (isActive) {
+          setStoredPhoto({ key: certificationKey, url: remotePhotoUrl });
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
     }
 
     void getCertificationPhoto(certificationKey)
@@ -276,7 +358,7 @@ export function SweatStampApp() {
         URL.revokeObjectURL(photoUrl);
       }
     };
-  }, [certificationKey, completedCertification]);
+  }, [certificationKey, completedCertification, syncStatus]);
 
   function selectMember(memberId: MemberId) {
     setSelectedMemberId(memberId);
@@ -325,25 +407,55 @@ export function SweatStampApp() {
     setSaveError("");
 
     try {
-      await saveCertificationPhoto(certificationKey, photoPreview.file);
+      const nextCertification: Certification = {
+        completedAt: photoPreview.stampedAt.toISOString(),
+        memberId: selectedMemberId,
+        photoName: photoPreview.file.name,
+        routine: routine.trim(),
+      };
+
+      if (syncStatus === "shared") {
+        const savedCertification = await saveSharedCertification({
+          ...nextCertification,
+          photo: photoPreview.file,
+          workoutDate: todayKey,
+        });
+        nextCertification.photoPath = savedCertification.photoPath;
+      } else {
+        await saveCertificationPhoto(certificationKey, photoPreview.file);
+      }
+
       setCertifications((currentCertifications) => ({
         ...currentCertifications,
-        [certificationKey]: {
-          completedAt: photoPreview.stampedAt.toISOString(),
-          memberId: selectedMemberId,
-          photoName: photoPreview.file.name,
-          routine: routine.trim(),
-        },
+        [certificationKey]: nextCertification,
       }));
-    } catch {
-      setSaveError("사진을 저장하지 못했어요. 다시 시도해 주세요.");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "사진을 저장하지 못했어요. 다시 시도해 주세요.");
     } finally {
       setIsSaving(false);
     }
   }
 
   async function resetCertification() {
-    await deleteCertificationPhoto(certificationKey).catch(() => undefined);
+    setSaveError("");
+
+    try {
+      if (syncStatus === "shared" && completedCertification?.photoPath) {
+        await deleteSharedCertification({
+          completedAt: completedCertification.completedAt,
+          memberId: completedCertification.memberId,
+          photoPath: completedCertification.photoPath,
+          routine: completedCertification.routine,
+          workoutDate: todayKey,
+        });
+      } else {
+        await deleteCertificationPhoto(certificationKey).catch(() => undefined);
+      }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "인증 기록을 삭제하지 못했어요.");
+      return;
+    }
+
     setCertifications((currentCertifications) => {
       const nextCertifications = { ...currentCertifications };
       delete nextCertifications[certificationKey];
@@ -359,7 +471,7 @@ export function SweatStampApp() {
         <header className="flex items-center justify-between gap-4 pb-5">
           <div>
             <h1 className="stamp-wordmark">Sweat Stamp</h1>
-            <p className="mt-1 text-xs font-medium text-black/45">{formattedDate}</p>
+            <p className="mt-1 text-xs font-medium text-black/45">{formattedDate} · {syncStatusText}</p>
           </div>
           <div className="flex items-center gap-1.5" aria-label="오늘 인증 수">
             <strong className="text-lg">{MEMBER_PROFILES.filter((member) => certifications[getCertificationKey(member.id, todayKey)]).length}</strong>
