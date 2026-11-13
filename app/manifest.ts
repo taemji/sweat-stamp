@@ -1,15 +1,18 @@
 import type { MetadataRoute } from "next";
 
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-config";
+import { TEAM_THEME } from "@/lib/member-profiles";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Sweat Stamp",
-    short_name: "Sweat Stamp",
-    description: "네 사람의 매일 운동을 사진으로 남기는 인증 앱",
+    name: APP_NAME,
+    short_name: APP_NAME,
+    description: APP_DESCRIPTION,
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#fef2c9",
-    theme_color: "#fef2c9",
+    background_color: TEAM_THEME.accentSoft,
+    theme_color: TEAM_THEME.accentSoft,
     icons: [
       {
         src: "/icons/icon-192.png",

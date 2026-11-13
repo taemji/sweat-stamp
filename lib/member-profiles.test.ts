@@ -66,4 +66,13 @@ describe("member profiles", () => {
     expect(isMemberId("unknown")).toBe(false);
     expect(getMemberProfile("sook").name).toBe("SOOK");
   });
+
+  it("records each lineup image at its real pixel size", async () => {
+    const { default: sharp } = await import("sharp");
+
+    for (const member of MEMBER_PROFILES) {
+      const { width, height } = await sharp(path.join(process.cwd(), "public", member.lineup.src)).metadata();
+      expect([width, height], member.name).toEqual([member.lineup.width, member.lineup.height]);
+    }
+  });
 });

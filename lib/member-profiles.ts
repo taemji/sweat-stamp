@@ -1,7 +1,9 @@
+const SEOUL_TIME_ZONE = "Asia/Seoul";
+
 export const MEMBER_PROFILES = [
   {
     id: "taem",
-    timeZone: "Asia/Seoul",
+    timeZone: SEOUL_TIME_ZONE,
     name: "TAEM",
     mainWorkout: "Ballet",
     subWorkout: "Stretching",
@@ -29,7 +31,7 @@ export const MEMBER_PROFILES = [
   },
   {
     id: "sook",
-    timeZone: "Asia/Seoul",
+    timeZone: SEOUL_TIME_ZONE,
     name: "SOOK",
     mainWorkout: "Pilates",
     subWorkout: "Stretching",
@@ -43,7 +45,7 @@ export const MEMBER_PROFILES = [
   },
   {
     id: "yoom",
-    timeZone: "Asia/Seoul",
+    timeZone: SEOUL_TIME_ZONE,
     name: "YOOM",
     mainWorkout: "Diet Dance",
     subWorkout: "Stretching",
@@ -57,7 +59,7 @@ export const MEMBER_PROFILES = [
   },
 ] as const;
 
-export const TEAM_TIME_ZONE = "Asia/Seoul";
+export const TEAM_TIME_ZONE = SEOUL_TIME_ZONE;
 
 export const TEAM_THEME = {
   accent: "#94650f",

@@ -8,7 +8,8 @@ const sourceDir = path.resolve(process.env.CHARACTER_IMAGE_DIR ?? path.join(root
 const charactersDir = path.join(rootDir, "public", "characters");
 const iconsDir = path.join(rootDir, "public", "icons");
 const appDir = path.join(rootDir, "app");
-const creamBackground = "#fef2c9";
+// Matches TEAM_THEME.accentSoft in lib/member-profiles.ts and the team_lineup.png backdrop.
+const creamBackground = "#fef1ca";
 
 const members = [
   { id: "taem", portrait: "taem_id.png", workout: "taem_ballet.png" },

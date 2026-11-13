@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-config";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -10,8 +12,8 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Sweat Stamp",
-  description: "네 사람의 매일 운동을 사진으로 남기는 인증 앱",
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
 };
 
 export default function RootLayout({
