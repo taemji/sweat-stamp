@@ -10,8 +10,8 @@ export const MEMBER_PROFILES = [
     message: "오늘의 힘을 한 장으로 남겨요.",
   },
   {
-    id: "saem",
-    name: "SAEM",
+    id: "sam",
+    name: "SAM",
     character: "drop",
     accent: "#f4d600",
     accentSoft: "#fff5a8",
@@ -30,8 +30,8 @@ export const MEMBER_PROFILES = [
     message: "꾸준히 쌓인 하루가 눈에 보여요.",
   },
   {
-    id: "yum",
-    name: "YUM",
+    id: "yoom",
+    name: "YOOM",
     character: "round",
     accent: "#8c63c7",
     accentSoft: "#eee3fa",

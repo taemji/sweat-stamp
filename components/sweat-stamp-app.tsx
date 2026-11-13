@@ -21,6 +21,7 @@ import {
 import {
   deleteCertificationPhoto,
   getCertificationPhoto,
+  migrateCertificationPhotoKeys,
   saveCertificationPhoto,
 } from "@/lib/certification-photo-store";
 import {
@@ -29,6 +30,12 @@ import {
   isMemberId,
   type MemberId,
 } from "@/lib/member-profiles";
+import {
+  getLegacyPhotoKeys,
+  migrateCertificationRecord,
+  migrateMemberRecord,
+  migrateSelectedMemberId,
+} from "@/lib/member-id-migration";
 
 interface Certification {
   completedAt: string;
@@ -36,6 +43,8 @@ interface Certification {
   photoName: string;
   routine: string;
 }
+
+type StoredCertification = Omit<Certification, "memberId"> & { memberId: string };
 
 type CertificationMap = Record<string, Certification>;
 type RoutineMap = Partial<Record<MemberId, string>>;
@@ -190,21 +199,25 @@ export function SweatStampApp() {
   } as CSSProperties;
 
   useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
+    const frameId = window.requestAnimationFrame(async () => {
       const storedMemberId = window.localStorage.getItem(selectedMemberStorageKey);
-      const storedRoutines = readStoredObject<RoutineMap>(routinesStorageKey);
-      const storedCertifications = readStoredObject<CertificationMap>(certificationsStorageKey);
+      const storedRoutines = readStoredObject<Record<string, string>>(routinesStorageKey);
+      const storedCertifications = readStoredObject<Record<string, StoredCertification>>(certificationsStorageKey);
+      const migratedMemberId = migrateSelectedMemberId(storedMemberId);
+      const migratedRoutines = migrateMemberRecord(storedRoutines ?? {}) as RoutineMap;
+      const migratedCertifications = migrateCertificationRecord(storedCertifications ?? {}) as CertificationMap;
 
-      if (isMemberId(storedMemberId)) {
-        setSelectedMemberId(storedMemberId);
+      if (isMemberId(migratedMemberId)) {
+        setSelectedMemberId(migratedMemberId);
       }
 
       if (storedRoutines) {
-        setRoutines(storedRoutines);
+        setRoutines(migratedRoutines);
       }
 
       if (storedCertifications) {
-        setCertifications(storedCertifications);
+        await migrateCertificationPhotoKeys(getLegacyPhotoKeys(Object.keys(migratedCertifications))).catch(() => undefined);
+        setCertifications(migratedCertifications);
       }
 
       setHasHydrated(true);

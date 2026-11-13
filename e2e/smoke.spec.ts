@@ -22,7 +22,7 @@ test("home opens the shared calendar before member screens", async ({ page }) =>
   await expect(page.getByRole("button", { name: "이전 달" })).toBeVisible();
   await expect(page.getByRole("button", { name: "다음 달" })).toBeVisible();
 
-  for (const memberName of ["TAEM", "SAEM", "SSUK", "YUM"]) {
+  for (const memberName of ["TAEM", "SAM", "SSUK", "YOOM"]) {
     const memberButton = page.getByRole("button", { name: `${memberName} 선택` });
     await expect(memberButton).toBeVisible();
     await memberButton.click();
@@ -35,12 +35,34 @@ test("home opens the shared calendar before member screens", async ({ page }) =>
 test("member routines stay independent", async ({ page }) => {
   await page.getByRole("button", { name: "TAEM 선택" }).click();
   await page.getByLabel("오늘의 운동").fill("러닝 5km");
-  await page.getByRole("button", { name: "SAEM 선택" }).click();
+  await page.getByRole("button", { name: "SAM 선택" }).click();
   await expect(page.getByLabel("오늘의 운동")).toHaveValue("");
   await page.getByLabel("오늘의 운동").fill("필라테스");
 
   await page.getByRole("button", { name: "TAEM 선택" }).click();
   await expect(page.getByLabel("오늘의 운동")).toHaveValue("러닝 5km");
+});
+
+test("legacy member ids migrate to sam and yoom", async ({ page }) => {
+  await page.evaluate(() => {
+    window.localStorage.setItem("sweat-stamp:selected-member", "saem");
+    window.localStorage.setItem("sweat-stamp:routines", JSON.stringify({ saem: "필라테스", yum: "러닝" }));
+    window.localStorage.setItem("sweat-stamp:certifications", JSON.stringify({
+      "2026-11-13:saem": { completedAt: "2026-11-13T00:00:00.000Z", memberId: "saem", photoName: "sam.png", routine: "필라테스" },
+      "2026-11-13:yum": { completedAt: "2026-11-13T00:00:00.000Z", memberId: "yum", photoName: "yoom.png", routine: "러닝" },
+    }));
+  });
+  await page.reload();
+
+  const migratedStorage = await page.evaluate(() => ({
+    selectedMember: window.localStorage.getItem("sweat-stamp:selected-member"),
+    routines: JSON.parse(window.localStorage.getItem("sweat-stamp:routines") ?? "{}"),
+    certifications: JSON.parse(window.localStorage.getItem("sweat-stamp:certifications") ?? "{}"),
+  }));
+
+  expect(migratedStorage.selectedMember).toBe("sam");
+  expect(migratedStorage.routines).toEqual({ sam: "필라테스", yoom: "러닝" });
+  expect(Object.keys(migratedStorage.certifications).sort()).toEqual(["2026-11-13:sam", "2026-11-13:yoom"]);
 });
 
 test("photo and workout check complete today's certification", async ({ page }) => {

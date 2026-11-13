@@ -64,3 +64,43 @@ export async function deleteCertificationPhoto(key: string) {
     database.close();
   }
 }
+
+export async function migrateCertificationPhotoKeys(migrations: Array<{ legacyKey: string; nextKey: string }>) {
+  if (migrations.length === 0) {
+    return;
+  }
+
+  const database = await openPhotoDatabase();
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(photoStoreName, "readwrite");
+      const photoStore = transaction.objectStore(photoStoreName);
+
+      for (const { legacyKey, nextKey } of migrations) {
+        const currentPhotoRequest = photoStore.get(nextKey);
+
+        currentPhotoRequest.onsuccess = () => {
+          if (currentPhotoRequest.result instanceof Blob) {
+            photoStore.delete(legacyKey);
+            return;
+          }
+
+          const legacyPhotoRequest = photoStore.get(legacyKey);
+          legacyPhotoRequest.onsuccess = () => {
+            if (legacyPhotoRequest.result instanceof Blob) {
+              photoStore.put(legacyPhotoRequest.result, nextKey);
+              photoStore.delete(legacyKey);
+            }
+          };
+        };
+      }
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("사진 키를 이전할 수 없어요."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("사진 키 이전이 취소됐어요."));
+    });
+  } finally {
+    database.close();
+  }
+}
