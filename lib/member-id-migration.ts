@@ -2,6 +2,7 @@ import type { MemberId } from "./member-profiles";
 
 const legacyMemberIds = {
   saem: "sam",
+  ssuk: "sook",
   yum: "yoom",
 } as const satisfies Record<string, MemberId>;
 
@@ -62,15 +63,13 @@ export function migrateCertificationRecord<T extends { memberId: string }>(recor
 }
 
 export function getLegacyPhotoKeys(certificationKeys: string[]) {
-  return certificationKeys.flatMap((key) => {
-    if (key.endsWith(":sam")) {
-      return [{ legacyKey: `${key.slice(0, -4)}:saem`, nextKey: key }];
+  return certificationKeys.flatMap((key) => Object.entries(legacyMemberIds).flatMap(([legacyId, nextId]) => {
+    const suffix = `:${nextId}`;
+
+    if (!key.endsWith(suffix)) {
+      return [];
     }
 
-    if (key.endsWith(":yoom")) {
-      return [{ legacyKey: `${key.slice(0, -5)}:yum`, nextKey: key }];
-    }
-
-    return [];
-  });
+    return [{ legacyKey: `${key.slice(0, -suffix.length)}:${legacyId}`, nextKey: key }];
+  }));
 }

@@ -20,8 +20,8 @@ export const MEMBER_PROFILES = [
     message: "나만의 리듬으로 오늘도 완료.",
   },
   {
-    id: "ssuk",
-    name: "SSUK",
+    id: "sook",
+    name: "SOOK",
     character: "sprout",
     accent: "#65a94b",
     accentSoft: "#e1f2d7",

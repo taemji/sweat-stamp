@@ -4,8 +4,8 @@ import { MEMBER_PROFILES, getMemberProfile, isMemberId } from "./member-profiles
 
 describe("member profiles", () => {
   it("defines the four certification members in display order", () => {
-    expect(MEMBER_PROFILES.map((member) => member.id)).toEqual(["taem", "sam", "ssuk", "yoom"]);
-    expect(MEMBER_PROFILES.map((member) => member.name)).toEqual(["TAEM", "SAM", "SSUK", "YOOM"]);
+    expect(MEMBER_PROFILES.map((member) => member.id)).toEqual(["taem", "sam", "sook", "yoom"]);
+    expect(MEMBER_PROFILES.map((member) => member.name)).toEqual(["TAEM", "SAM", "SOOK", "YOOM"]);
     expect(MEMBER_PROFILES.map((member) => member.accent)).toEqual(["#d94b42", "#f4d600", "#65a94b", "#8c63c7"]);
   });
 
@@ -17,8 +17,9 @@ describe("member profiles", () => {
   it("validates and resolves only known member ids", () => {
     expect(isMemberId("taem")).toBe(true);
     expect(isMemberId("saem")).toBe(false);
+    expect(isMemberId("ssuk")).toBe(false);
     expect(isMemberId("yum")).toBe(false);
     expect(isMemberId("unknown")).toBe(false);
-    expect(getMemberProfile("ssuk").name).toBe("SSUK");
+    expect(getMemberProfile("sook").name).toBe("SOOK");
   });
 });

@@ -22,7 +22,7 @@ test("home opens the shared calendar before member screens", async ({ page }) =>
   await expect(page.getByRole("button", { name: "이전 달" })).toBeVisible();
   await expect(page.getByRole("button", { name: "다음 달" })).toBeVisible();
 
-  for (const memberName of ["TAEM", "SAM", "SSUK", "YOOM"]) {
+  for (const memberName of ["TAEM", "SAM", "SOOK", "YOOM"]) {
     const memberButton = page.getByRole("button", { name: `${memberName} 선택` });
     await expect(memberButton).toBeVisible();
     await memberButton.click();
@@ -46,9 +46,10 @@ test("member routines stay independent", async ({ page }) => {
 test("legacy member ids migrate to sam and yoom", async ({ page }) => {
   await page.evaluate(() => {
     window.localStorage.setItem("sweat-stamp:selected-member", "saem");
-    window.localStorage.setItem("sweat-stamp:routines", JSON.stringify({ saem: "필라테스", yum: "러닝" }));
+    window.localStorage.setItem("sweat-stamp:routines", JSON.stringify({ saem: "필라테스", ssuk: "수영", yum: "러닝" }));
     window.localStorage.setItem("sweat-stamp:certifications", JSON.stringify({
       "2026-11-13:saem": { completedAt: "2026-11-13T00:00:00.000Z", memberId: "saem", photoName: "sam.png", routine: "필라테스" },
+      "2026-11-13:ssuk": { completedAt: "2026-11-13T00:00:00.000Z", memberId: "ssuk", photoName: "sook.png", routine: "수영" },
       "2026-11-13:yum": { completedAt: "2026-11-13T00:00:00.000Z", memberId: "yum", photoName: "yoom.png", routine: "러닝" },
     }));
   });
@@ -61,8 +62,8 @@ test("legacy member ids migrate to sam and yoom", async ({ page }) => {
   }));
 
   expect(migratedStorage.selectedMember).toBe("sam");
-  expect(migratedStorage.routines).toEqual({ sam: "필라테스", yoom: "러닝" });
-  expect(Object.keys(migratedStorage.certifications).sort()).toEqual(["2026-11-13:sam", "2026-11-13:yoom"]);
+  expect(migratedStorage.routines).toEqual({ sam: "필라테스", sook: "수영", yoom: "러닝" });
+  expect(Object.keys(migratedStorage.certifications).sort()).toEqual(["2026-11-13:sam", "2026-11-13:sook", "2026-11-13:yoom"]);
 });
 
 test("photo and workout check complete today's certification", async ({ page }) => {
