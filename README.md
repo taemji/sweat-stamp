@@ -78,7 +78,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
 ```
 
-3. Vercel에서 새 배포를 실행합니다. 연결되면 앱 헤더에 저장 상태 문구가 표시되지 않습니다. `공동 저장에 연결하지 못해 이 기기에만 저장돼요`가 보이면 SQL 마이그레이션과 Data API 설정을 확인합니다.
+3. Vercel에서 새 배포를 실행합니다. 연결되면 앱 헤더에 저장 상태 문구가 표시되지 않습니다. `인터넷 연결이 불안정해요. 지금 찍는 도장은 친구들에게 아직 안 보여요.`가 계속 보이면 SQL 마이그레이션과 Data API 설정을 확인합니다. 연결이 끊긴 동안 찍은 도장은 이 기기에 보관했다가 인터넷이 돌아오면 자동으로 올라갑니다. 같은 날 다른 기기에서 이미 찍은 도장이 있으면 먼저 찍은 도장이 남습니다.
 
 이 MVP는 로그인 없이 네 멤버가 사용하는 구조라 RLS가 멤버 ID, 날짜, 파일 경로와 형식을 제한합니다. 공개 배포 후 쓰기 권한을 더 강하게 보호하려면 멤버별 PIN 또는 Supabase Auth를 추가해야 합니다.
 

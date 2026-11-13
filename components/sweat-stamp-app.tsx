@@ -16,10 +16,14 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   WEEKDAY_LABELS,
+  countCertificationsInMonth,
   formatDayLabel,
+  getCertificationKey,
   getLocalDateKey,
   getMonthCalendarDays,
+  getMonthStart,
   getWeekDateKeys,
+  parseCertificationKey,
   shiftMonth,
 } from "@/lib/certification-calendar";
 import {
@@ -28,7 +32,8 @@ import {
   migrateCertificationPhotoKeys,
   saveCertificationPhoto,
 } from "@/lib/certification-photo-store";
-import { createDailyRoutines, readDailyRoutines } from "@/lib/daily-routines";
+import { shouldUploadPending, withTimeout } from "@/lib/certification-sync";
+import { createDailyRoutines, readDailyCustomIds, readDailyRoutines } from "@/lib/daily-routines";
 import { loadDefaultWorkoutPhoto } from "@/lib/default-workout-photo";
 import { formatKoreanHeadcount, formatKoreanOrdinal } from "@/lib/korean-format";
 import {
@@ -38,6 +43,7 @@ import {
   getMemberProfile,
   isMemberId,
   type MemberId,
+  type MemberProfile,
 } from "@/lib/member-profiles";
 import {
   getLegacyPhotoKeys,
@@ -46,6 +52,7 @@ import {
   migrateSelectedMemberId,
 } from "@/lib/member-id-migration";
 import {
+  MAX_ROUTINE_LENGTH,
   deleteSharedCertification,
   getSharedPhotoUrl,
   loadSharedCertifications,
@@ -59,7 +66,10 @@ import { isSupabaseConfigured } from "@/lib/supabase-client";
 interface Certification {
   completedAt: string;
   memberId: MemberId;
+  // Set for certifications stored in shared storage.
   photoPath?: string;
+  // Set for certifications saved on this device while shared storage was unreachable.
+  pendingUpload?: boolean;
   routine: string;
 }
 
@@ -73,25 +83,41 @@ type SyncStatus = "connecting" | "error" | "local" | "shared";
 const selectedMemberStorageKey = "sweat-stamp:selected-member";
 const routinesStorageKey = "sweat-stamp:routines";
 const certificationsStorageKey = "sweat-stamp:certifications";
-
-function getCertificationKey(memberId: MemberId, dateKey: string) {
-  return `${dateKey}:${memberId}`;
-}
+const loadingMessage = "오늘 기록을 불러오는 중이에요.";
+const offlineNotice = "인터넷 연결이 불안정해요. 지금 찍는 도장은 친구들에게 아직 안 보여요.";
+const sharedLoadTimeoutMs = 10_000;
+const syncRetryMs = 30_000;
 
 function getStampFontFamily() {
   return getComputedStyle(document.documentElement).getPropertyValue("--font-bricolage").trim();
 }
 
+function readStoredText(key: string) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 function readStoredObject<T extends object>(key: string): T | null {
   try {
-    const storedValue = window.localStorage.getItem(key);
+    const storedValue = readStoredText(key);
     return storedValue ? JSON.parse(storedValue) as T : null;
   } catch {
     return null;
   }
 }
 
-function mapSharedCertificationRecords(sharedCertifications: SharedCertification[]) {
+function writeStoredText(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Storage can be full or blocked; the app keeps working from memory.
+  }
+}
+
+function mapSharedCertificationRecords(sharedCertifications: SharedCertification[]): CertificationMap {
   return Object.fromEntries(sharedCertifications.map((certification) => [
     getCertificationKey(certification.memberId, certification.workoutDate),
     {
@@ -101,6 +127,24 @@ function mapSharedCertificationRecords(sharedCertifications: SharedCertification
       routine: certification.routine,
     } satisfies Certification,
   ]));
+}
+
+function pickPendingCertifications(certifications: CertificationMap): CertificationMap {
+  return Object.fromEntries(Object.entries(certifications).filter(([, certification]) => certification.pendingUpload));
+}
+
+function pickDeviceCertifications(certifications: CertificationMap): CertificationMap {
+  return Object.fromEntries(Object.entries(certifications).filter(([, certification]) => !certification.photoPath));
+}
+
+function stampPhotoForMember(member: MemberProfile, photo: File, stampedAt: Date) {
+  return createStampedPhoto(photo, {
+    accent: member.accent,
+    fontFamily: getStampFontFamily(),
+    memberName: member.name,
+    stampedAt,
+    timeZone: member.timeZone,
+  });
 }
 
 interface CalendarOverviewProps {
@@ -120,7 +164,7 @@ function CalendarOverview({
   const monthName = new Intl.DateTimeFormat("en-US", { month: "long" }).format(visibleMonth);
 
   return (
-    <section className="stamp-sheet calendar-overview" aria-label="공동 인증 캘린더">
+    <section className="stamp-sheet calendar-overview" aria-label="도장 캘린더">
       <div className="calendar-heading">
         <div>
           <p className="calendar-eyebrow">Monthly stamps</p>
@@ -171,12 +215,10 @@ export function SweatStampApp() {
   const usesSharedStorage = isSupabaseConfigured();
   const [activeView, setActiveView] = useState<AppView>("calendar");
   const [selectedMemberId, setSelectedMemberId] = useState<MemberId>("taem");
-  const [visibleMonth, setVisibleMonth] = useState(() => {
-    const [year, month] = getLocalDateKey(new Date(), TEAM_TIME_ZONE).split("-").map(Number);
-    return new Date(year, month - 1, 1);
-  });
+  const [visibleMonth, setVisibleMonth] = useState(() => getMonthStart(getLocalDateKey(new Date(), TEAM_TIME_ZONE)));
   const [now, setNow] = useState(() => new Date());
   const [routines, setRoutines] = useState<RoutineMap>({});
+  const [customRoutineIds, setCustomRoutineIds] = useState<ReadonlySet<MemberId>>(new Set());
   const [certifications, setCertifications] = useState<CertificationMap>({});
   const [photoPreview, setPhotoPreview] = useState<{ file: File; stampedAt: Date; url: string } | null>(null);
   const [storedPhoto, setStoredPhoto] = useState<{ key: string; url: string } | null>(null);
@@ -186,16 +228,22 @@ export function SweatStampApp() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(usesSharedStorage ? "connecting" : "local");
   const [hasHydrated, setHasHydrated] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const selectedMemberIdRef = useRef<MemberId>(selectedMemberId);
+  const certificationsRef = useRef<CertificationMap>({});
+  const syncStateRef = useRef({ running: false, again: false });
+  const syncRef = useRef<() => Promise<void>>(async () => undefined);
+  const deviceDayRef = useRef(getLocalDateKey());
 
   const selectedMember = getMemberProfile(selectedMemberId);
   const teamTodayKey = getLocalDateKey(now, TEAM_TIME_ZONE);
   const todayKey = getLocalDateKey(now, selectedMember.timeZone);
   const certificationKey = getCertificationKey(selectedMemberId, todayKey);
   const completedCertification = certifications[certificationKey];
-  const routineInput = routines[selectedMemberId] ?? selectedMember.mainWorkout;
-  const routine = routineInput.trim();
+  const completedPhotoKey = completedCertification ? `${certificationKey}@${completedCertification.completedAt}` : "";
+  const storedRoutine = routines[selectedMemberId];
+  const routine = (storedRoutine ?? selectedMember.mainWorkout).trim();
   const workoutPresets: string[] = [selectedMember.mainWorkout, selectedMember.subWorkout];
-  const isPresetRoutine = workoutPresets.includes(routine);
+  const isCustomRoutine = customRoutineIds.has(selectedMemberId) || !workoutPresets.includes(routine);
   const weekDays = getWeekDateKeys(todayKey).map((dateKey, index) => ({
     dateKey,
     isDone: Boolean(certifications[getCertificationKey(selectedMemberId, dateKey)]),
@@ -210,15 +258,12 @@ export function SweatStampApp() {
     certifications[getCertificationKey(member.id, getLocalDateKey(now, member.timeZone))]
   ));
   const todayDoneIds = new Set<MemberId>(todayDoneMembers.map((member) => member.id));
-  const teamMonthPrefix = `${teamTodayKey.slice(0, 7)}-`;
-  const monthlyCounts = new Map(MEMBER_PROFILES.map((member) => [
-    member.id,
-    Object.keys(certifications).filter((key) => key.startsWith(teamMonthPrefix) && key.endsWith(`:${member.id}`)).length,
-  ]));
+  const certificationKeys = Object.keys(certifications);
+  const visibleMonthNumber = visibleMonth.getMonth() + 1;
   const remainingMemberCount = memberCount - todayDoneMembers.length;
   const isStorageReady = hasHydrated && syncStatus !== "connecting";
-  const syncNotice = syncStatus === "error" ? "공동 저장에 연결하지 못해 이 기기에만 저장돼요" : "";
-  const loadingMessage = "오늘 기록을 불러오는 중이에요.";
+  const isTeamStatusKnown = isStorageReady && syncStatus !== "error";
+  const hasPendingUploads = Object.values(certifications).some((certification) => certification.pendingUpload);
   const canCertify = isStorageReady && !isProcessingPhoto;
   const isCalendarView = activeView === "calendar";
   const themeStyle = {
@@ -230,44 +275,38 @@ export function SweatStampApp() {
   useEffect(() => {
     let isActive = true;
     const frameId = window.requestAnimationFrame(async () => {
-      const storedMemberId = window.localStorage.getItem(selectedMemberStorageKey);
-      const todaysRoutines = readDailyRoutines(readStoredObject(routinesStorageKey), getLocalDateKey());
+      const migratedMemberId = migrateSelectedMemberId(readStoredText(selectedMemberStorageKey));
+      const storedRoutines = readStoredObject(routinesStorageKey);
+      const todaysRoutines = readDailyRoutines(storedRoutines, getLocalDateKey());
+      const todaysCustomIds = readDailyCustomIds(storedRoutines, getLocalDateKey()).filter(isMemberId);
       const storedCertifications = readStoredObject<Record<string, StoredCertification>>(certificationsStorageKey);
-      const migratedMemberId = migrateSelectedMemberId(storedMemberId);
       const migratedCertifications = migrateCertificationRecord(storedCertifications ?? {}) as CertificationMap;
+      // Shared records cached by older versions are only a copy of the server; read the server instead.
+      const deviceCertifications = pickDeviceCertifications(migratedCertifications);
 
       if (isMemberId(migratedMemberId)) {
+        selectedMemberIdRef.current = migratedMemberId;
         setSelectedMemberId(migratedMemberId);
       }
 
       setRoutines(migrateMemberRecord(todaysRoutines) as RoutineMap);
+      setCustomRoutineIds(new Set(todaysCustomIds));
 
       if (storedCertifications) {
         await migrateCertificationPhotoKeys(getLegacyPhotoKeys(Object.keys(migratedCertifications))).catch(() => undefined);
-      }
-
-      let nextCertifications = migratedCertifications;
-
-      if (usesSharedStorage) {
-        try {
-          nextCertifications = mapSharedCertificationRecords(await loadSharedCertifications());
-          if (isActive) {
-            setSyncStatus("shared");
-          }
-        } catch {
-          if (isActive) {
-            setSyncStatus("error");
-          }
-        }
       }
 
       if (!isActive) {
         return;
       }
 
-      setCertifications(nextCertifications);
-
+      certificationsRef.current = deviceCertifications;
+      setCertifications(deviceCertifications);
       setHasHydrated(true);
+
+      if (usesSharedStorage) {
+        void syncRef.current();
+      }
     });
 
     return () => {
@@ -277,7 +316,19 @@ export function SweatStampApp() {
   }, [usesSharedStorage]);
 
   useEffect(() => {
-    const timerId = window.setInterval(() => setNow(new Date()), 60_000);
+    const timerId = window.setInterval(() => {
+      const nextNow = new Date();
+      const deviceDay = getLocalDateKey(nextNow);
+
+      setNow(nextNow);
+
+      if (deviceDay !== deviceDayRef.current) {
+        deviceDayRef.current = deviceDay;
+        setRoutines({});
+        setCustomRoutineIds(new Set());
+      }
+    }, 60_000);
+
     return () => window.clearInterval(timerId);
   }, []);
 
@@ -286,22 +337,43 @@ export function SweatStampApp() {
       return;
     }
 
-    window.localStorage.setItem(selectedMemberStorageKey, selectedMemberId);
-    window.localStorage.setItem(routinesStorageKey, JSON.stringify(createDailyRoutines(routines as Record<string, string>, getLocalDateKey())));
-    window.localStorage.setItem(certificationsStorageKey, JSON.stringify(certifications));
-  }, [certifications, hasHydrated, routines, selectedMemberId]);
+    writeStoredText(selectedMemberStorageKey, selectedMemberId);
+    writeStoredText(routinesStorageKey, JSON.stringify(createDailyRoutines(routines as Record<string, string>, deviceDayRef.current, customRoutineIds)));
+    writeStoredText(certificationsStorageKey, JSON.stringify(pickDeviceCertifications(certifications)));
+  }, [certifications, customRoutineIds, hasHydrated, routines, selectedMemberId]);
 
   useEffect(() => {
-    if (syncStatus !== "shared") {
+    certificationsRef.current = certifications;
+  }, [certifications]);
+
+  useEffect(() => {
+    syncRef.current = runSync;
+  });
+
+  useEffect(() => {
+    if (!usesSharedStorage || !hasHydrated) {
       return;
     }
 
     return subscribeToSharedCertifications(() => {
-      void loadSharedCertifications()
-        .then((sharedCertifications) => setCertifications(mapSharedCertificationRecords(sharedCertifications)))
-        .catch(() => setSyncStatus("error"));
+      void syncRef.current();
     }) ?? undefined;
-  }, [syncStatus]);
+  }, [hasHydrated, usesSharedStorage]);
+
+  useEffect(() => {
+    if (!usesSharedStorage || !hasHydrated || (syncStatus !== "error" && !hasPendingUploads)) {
+      return;
+    }
+
+    const retry = () => void syncRef.current();
+    const timerId = window.setInterval(retry, syncRetryMs);
+    window.addEventListener("online", retry);
+
+    return () => {
+      window.clearInterval(timerId);
+      window.removeEventListener("online", retry);
+    };
+  }, [hasHydrated, hasPendingUploads, syncStatus, usesSharedStorage]);
 
   useEffect(() => {
     return () => {
@@ -319,11 +391,11 @@ export function SweatStampApp() {
       return;
     }
 
-    if (completedCertification.photoPath && syncStatus === "shared") {
+    if (completedCertification.photoPath) {
       const remotePhotoUrl = getSharedPhotoUrl(completedCertification.photoPath, completedCertification.completedAt);
       void Promise.resolve().then(() => {
         if (isActive) {
-          setStoredPhoto({ key: certificationKey, url: remotePhotoUrl });
+          setStoredPhoto({ key: completedPhotoKey, url: remotePhotoUrl });
         }
       });
 
@@ -339,7 +411,7 @@ export function SweatStampApp() {
         }
 
         photoUrl = URL.createObjectURL(photo);
-        setStoredPhoto({ key: certificationKey, url: photoUrl });
+        setStoredPhoto({ key: completedPhotoKey, url: photoUrl });
       })
       .catch(() => {
         if (isActive) {
@@ -354,22 +426,105 @@ export function SweatStampApp() {
         URL.revokeObjectURL(photoUrl);
       }
     };
-  }, [certificationKey, completedCertification, syncStatus]);
+  }, [certificationKey, completedCertification, completedPhotoKey]);
 
-  function stampForSelectedMember(photo: File, stampedAt: Date) {
-    return createStampedPhoto(photo, {
-      accent: selectedMember.accent,
-      fontFamily: getStampFontFamily(),
-      memberName: selectedMember.name,
-      stampedAt,
-      timeZone: selectedMember.timeZone,
-    });
+  async function syncOnce() {
+    const pendingSnapshot = pickPendingCertifications(certificationsRef.current);
+    let sharedCertifications: CertificationMap;
+
+    try {
+      sharedCertifications = mapSharedCertificationRecords(
+        await withTimeout(loadSharedCertifications(), sharedLoadTimeoutMs),
+      );
+    } catch {
+      setSyncStatus("error");
+      return;
+    }
+
+    setCertifications((currentCertifications) => ({
+      ...sharedCertifications,
+      ...pickPendingCertifications(currentCertifications),
+    }));
+    setSyncStatus("shared");
+
+    const resolved: CertificationMap = {};
+    const discarded: string[] = [];
+
+    for (const [key, certification] of Object.entries(pendingSnapshot)) {
+      if (!shouldUploadPending(certification, sharedCertifications[key])) {
+        await deleteCertificationPhoto(key).catch(() => undefined);
+        discarded.push(key);
+        continue;
+      }
+
+      try {
+        const photo = await getCertificationPhoto(key);
+
+        if (!photo) {
+          continue;
+        }
+
+        const saved = await saveSharedCertification({
+          completedAt: certification.completedAt,
+          memberId: certification.memberId,
+          photo: new File([photo], `${certification.memberId}-stamped.jpg`, { type: photo.type || "image/jpeg" }),
+          routine: certification.routine,
+          workoutDate: parseCertificationKey(key).dateKey,
+        });
+        resolved[key] = {
+          completedAt: certification.completedAt,
+          memberId: certification.memberId,
+          photoPath: saved.photoPath,
+          routine: certification.routine,
+        };
+        await deleteCertificationPhoto(key).catch(() => undefined);
+      } catch {
+        // Stays pending; the retry loop tries again.
+      }
+    }
+
+    if (discarded.length > 0 || Object.keys(resolved).length > 0) {
+      setCertifications((currentCertifications) => {
+        const nextCertifications = { ...currentCertifications, ...resolved };
+
+        for (const key of discarded) {
+          if (sharedCertifications[key]) {
+            nextCertifications[key] = sharedCertifications[key];
+          }
+        }
+
+        return nextCertifications;
+      });
+    }
+  }
+
+  // One sync at a time; a request made during a sync runs once more after it.
+  async function runSync() {
+    const syncState = syncStateRef.current;
+
+    if (syncState.running) {
+      syncState.again = true;
+      return;
+    }
+
+    syncState.running = true;
+
+    try {
+      do {
+        syncState.again = false;
+        await syncOnce();
+      } while (syncState.again);
+    } finally {
+      syncState.running = false;
+    }
   }
 
   function selectMember(memberId: MemberId) {
+    selectedMemberIdRef.current = memberId;
     setSelectedMemberId(memberId);
     setActiveView(memberId);
     setPhotoPreview(null);
+    setSaveError("");
   }
 
   async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -380,32 +535,52 @@ export function SweatStampApp() {
       return;
     }
 
+    const member = selectedMember;
     const stampedAt = new Date();
     setIsProcessingPhoto(true);
     setSaveError("");
 
     try {
-      const stampedPhoto = await stampForSelectedMember(file, stampedAt);
-      setPhotoPreview({ file: stampedPhoto, stampedAt, url: URL.createObjectURL(stampedPhoto) });
+      const stampedPhoto = await stampPhotoForMember(member, file, stampedAt);
+
+      // The member may have switched screens while the photo was being stamped.
+      if (selectedMemberIdRef.current === member.id) {
+        setPhotoPreview({ file: stampedPhoto, stampedAt, url: URL.createObjectURL(stampedPhoto) });
+      }
     } catch (error) {
-      setPhotoPreview(null);
-      setSaveError(error instanceof Error ? error.message : "사진을 처리하지 못했어요.");
+      if (selectedMemberIdRef.current === member.id) {
+        setPhotoPreview(null);
+        setSaveError(error instanceof Error ? error.message : "사진을 처리하지 못했어요.");
+      }
     } finally {
       setIsProcessingPhoto(false);
     }
   }
 
-  function updateRoutine(nextRoutine: string) {
+  function updateRoutine(nextRoutine: string, source: "preset" | "custom") {
+    const isEmpty = !nextRoutine.trim();
+
     setRoutines((currentRoutines) => {
       const nextRoutines = { ...currentRoutines };
 
-      if (nextRoutine.trim()) {
-        nextRoutines[selectedMemberId] = nextRoutine;
-      } else {
+      if (isEmpty) {
         delete nextRoutines[selectedMemberId];
+      } else {
+        nextRoutines[selectedMemberId] = nextRoutine;
       }
 
       return nextRoutines;
+    });
+    setCustomRoutineIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+
+      if (source === "custom" && !isEmpty) {
+        nextIds.add(selectedMemberId);
+      } else {
+        nextIds.delete(selectedMemberId);
+      }
+
+      return nextIds;
     });
   }
 
@@ -418,39 +593,58 @@ export function SweatStampApp() {
       return;
     }
 
+    const member = selectedMember;
     setIsSaving(true);
     setSaveError("");
 
     try {
+      const certifiedAt = new Date();
       let certificationPhoto = photoPreview;
 
       if (!certificationPhoto) {
-        const stampedAt = new Date();
-        const stampedPhoto = await stampForSelectedMember(await loadDefaultWorkoutPhoto(selectedMember), stampedAt);
-        certificationPhoto = { file: stampedPhoto, stampedAt, url: "" };
+        const stampedPhoto = await stampPhotoForMember(member, await loadDefaultWorkoutPhoto(member), certifiedAt);
+        certificationPhoto = { file: stampedPhoto, stampedAt: certifiedAt, url: "" };
       }
 
+      // The workout date is the member's date on the stamp, so the photo and the record always agree.
+      const workoutDate = getLocalDateKey(certificationPhoto.stampedAt, member.timeZone);
+      const key = getCertificationKey(member.id, workoutDate);
       const nextCertification: Certification = {
         completedAt: certificationPhoto.stampedAt.toISOString(),
-        memberId: selectedMemberId,
+        memberId: member.id,
         routine,
       };
+      let savedToServer = false;
 
       if (syncStatus === "shared") {
-        const savedCertification = await saveSharedCertification({
-          ...nextCertification,
-          photo: certificationPhoto.file,
-          workoutDate: todayKey,
-        });
-        nextCertification.photoPath = savedCertification.photoPath;
-      } else {
-        await saveCertificationPhoto(certificationKey, certificationPhoto.file);
+        try {
+          const savedCertification = await saveSharedCertification({
+            ...nextCertification,
+            photo: certificationPhoto.file,
+            workoutDate,
+          });
+          nextCertification.photoPath = savedCertification.photoPath;
+          savedToServer = true;
+        } catch {
+          setSyncStatus("error");
+        }
       }
 
+      if (!savedToServer) {
+        await saveCertificationPhoto(key, certificationPhoto.file);
+        nextCertification.pendingUpload = usesSharedStorage || undefined;
+      }
+
+      setNow(certifiedAt);
       setCertifications((currentCertifications) => ({
         ...currentCertifications,
-        [certificationKey]: nextCertification,
+        [key]: nextCertification,
       }));
+      setPhotoPreview(null);
+
+      if (savedToServer) {
+        void syncRef.current();
+      }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "사진을 저장하지 못했어요. 다시 시도해 주세요.");
     } finally {
@@ -461,20 +655,23 @@ export function SweatStampApp() {
   async function resetCertification() {
     setSaveError("");
 
-    if (completedCertification?.photoPath && syncStatus !== "shared") {
-      setSaveError("공동 저장에 연결된 뒤 다시 시도해 주세요.");
+    if (!completedCertification) {
+      return;
+    }
+
+    if (completedCertification.photoPath && syncStatus !== "shared") {
+      setSaveError("인터넷에 다시 연결된 뒤 시도해 주세요.");
       return;
     }
 
     try {
-      if (completedCertification?.photoPath) {
+      if (completedCertification.photoPath) {
         await deleteSharedCertification({
-          completedAt: completedCertification.completedAt,
           memberId: completedCertification.memberId,
           photoPath: completedCertification.photoPath,
-          routine: completedCertification.routine,
           workoutDate: todayKey,
         });
+        void syncRef.current();
       } else {
         await deleteCertificationPhoto(certificationKey).catch(() => undefined);
       }
@@ -488,6 +685,7 @@ export function SweatStampApp() {
       delete nextCertifications[certificationKey];
       return nextCertifications;
     });
+    setStoredPhoto(null);
     setPhotoPreview(null);
   }
 
@@ -497,7 +695,7 @@ export function SweatStampApp() {
         <header className="stamp-header">
           <div className="min-w-0">
             <h1 className="stamp-wordmark">Sweat Stamp</h1>
-            {syncNotice && <p className="stamp-meta" role="status">{syncNotice}</p>}
+            {syncStatus === "error" && <p className="stamp-meta" role="status">{offlineNotice}</p>}
           </div>
         </header>
 
@@ -513,15 +711,15 @@ export function SweatStampApp() {
                 className="member-chip"
                 data-selected={isSelected}
                 style={{ "--chip-accent": member.accent } as CSSProperties}
-                aria-label={`${member.name} 선택`}
+                aria-label={`${member.name} 선택${isComplete ? ", 오늘 인증 완료" : ""}`}
                 aria-pressed={isSelected}
                 onClick={() => selectMember(member.id)}
               >
                 <Image className="member-chip-avatar" src={member.avatar} alt="" width={64} height={64} priority />
                 {isSelected && <span className="member-chip-name">{member.name}</span>}
                 {isComplete && (
-                  <span className="member-chip-done">
-                    <CheckIcon aria-label="인증 완료" />
+                  <span className="member-chip-done" aria-hidden="true">
+                    <CheckIcon />
                   </span>
                 )}
               </button>
@@ -545,28 +743,36 @@ export function SweatStampApp() {
               <div className="hero-copy">
                 <p className="hero-date">{teamDayLabel}</p>
                 <h2 id="team-heading" className="hero-title">
-                  {!isStorageReady
+                  {!isTeamStatusKnown
                     ? <>오늘의<br />도장</>
                     : todayDoneMembers.length === 0
-                    ? <>오늘 첫 도장은<br />누가 찍을까요</>
-                    : remainingMemberCount === 0
-                      ? <>오늘은 모두<br />해냈어요</>
-                      : <>{memberCount}명 중 {todayDoneMembers.length}명이<br />도장 찍었어요</>}
-                  <span className="hero-dot">{isStorageReady && todayDoneMembers.length === 0 ? "?" : "."}</span>
+                      ? <>오늘 첫 도장은<br />누가 찍을까요</>
+                      : remainingMemberCount === 0
+                        ? <>오늘은 모두<br />해냈어요</>
+                        : <>{memberCount}명 중 {todayDoneMembers.length}명이<br />도장 찍었어요</>}
+                  <span className="hero-dot">{isTeamStatusKnown && todayDoneMembers.length === 0 ? "?" : "."}</span>
                 </h2>
                 <p className="hero-line">
                   {!isStorageReady
                     ? loadingMessage
-                    : todayDoneMembers.length === 0
-                    ? `${formatKoreanHeadcount(memberCount)} 모두 아직이에요.`
-                    : remainingMemberCount === 0
-                      ? `${formatKoreanHeadcount(memberCount)} 모두 도장을 찍었어요.`
-                      : `남은 ${formatKoreanHeadcount(remainingMemberCount)}도 같이 가 볼까요?`}
+                    : !isTeamStatusKnown
+                      ? "친구들 기록을 불러오지 못했어요."
+                      : todayDoneMembers.length === 0
+                      ? `${formatKoreanHeadcount(memberCount)} 모두 아직이에요.`
+                      : remainingMemberCount === 0
+                        ? `${formatKoreanHeadcount(memberCount)} 모두 도장을 찍었어요.`
+                        : `남은 ${formatKoreanHeadcount(remainingMemberCount)}도 같이 가 볼까요?`}
                 </p>
               </div>
-              <div className="team-lineup" role="group" aria-label={isStorageReady ? `오늘 ${todayDoneMembers.length}명 인증` : "네 멤버"} data-loading={!isStorageReady}>
+              <div
+                className="team-lineup"
+                role="group"
+                aria-label={isTeamStatusKnown ? `오늘 ${todayDoneMembers.length}명 인증` : `${memberCount}명의 멤버`}
+                data-loading={!isTeamStatusKnown}
+              >
                 {MEMBER_PROFILES.map((member) => {
                   const isDone = todayDoneIds.has(member.id);
+                  const monthlyCount = countCertificationsInMonth(certificationKeys, member.id, visibleMonth);
 
                   return (
                     <button
@@ -575,7 +781,7 @@ export function SweatStampApp() {
                       className="team-lineup-member"
                       data-done={isDone}
                       style={{ flexGrow: member.lineup.width }}
-                      aria-label={`${member.name} ${isDone ? "오늘 인증 완료" : "오늘 인증 전"}, 이번 달 ${monthlyCounts.get(member.id)}회, 인증 화면 열기`}
+                      aria-label={`${member.name} ${isDone ? "오늘 인증 완료" : "오늘 인증 전"}, ${visibleMonthNumber}월 ${monthlyCount}회, 인증 화면 열기`}
                       onClick={() => selectMember(member.id)}
                     >
                       <Image
@@ -586,7 +792,7 @@ export function SweatStampApp() {
                         priority
                       />
                       <span className="team-lineup-count" style={{ "--chip-accent": member.accent } as CSSProperties} aria-hidden="true">
-                        {isStorageReady ? `${monthlyCounts.get(member.id)}회` : "\u00a0"}
+                        {isTeamStatusKnown ? `${monthlyCount}회` : " "}
                       </span>
                     </button>
                   );
@@ -635,7 +841,7 @@ export function SweatStampApp() {
                       안녕,<br /><span className="font-display">{selectedMember.name}</span><span className="hero-dot">.</span>
                     </h2>
                     <p className="hero-line">
-                      오늘 <b>{routine}</b> 하고<br />도장 하나 찍어 볼까요?
+                      오늘 <b className="hero-workout">{routine}</b> 하고<br />도장 하나 찍어 볼까요?
                     </p>
                   </>
                 )}
@@ -664,7 +870,7 @@ export function SweatStampApp() {
               </section>
             ) : completedCertification ? (
               <section className="stamp-sheet certification-complete" aria-live="polite">
-                {storedPhoto?.key === certificationKey && (
+                {storedPhoto?.key === completedPhotoKey && (
                   <div
                     className="completed-photo"
                     style={{ backgroundImage: `url(${storedPhoto.url})` }}
@@ -688,7 +894,7 @@ export function SweatStampApp() {
               <section className="stamp-sheet" aria-label="오늘 인증">
                 <div className="workout-list" role="group" aria-label="운동 빠르게 선택">
                   {workoutPresets.map((workout) => {
-                    const isPicked = routine === workout;
+                    const isPicked = !isCustomRoutine && routine === workout;
 
                     return (
                       <button
@@ -696,22 +902,24 @@ export function SweatStampApp() {
                         type="button"
                         className="workout-row"
                         aria-pressed={isPicked}
-                        onClick={() => updateRoutine(workout)}
+                        onClick={() => updateRoutine(workout, "preset")}
                       >
                         <strong className="workout-row-label">{workout}</strong>
                         <span className="workout-row-mark" aria-hidden="true">{isPicked && <CheckIcon />}</span>
                       </button>
                     );
                   })}
-                  <label className="workout-row workout-row-custom" htmlFor="daily-routine">
+                  <label className="workout-row workout-row-custom" htmlFor="daily-routine" data-selected={isCustomRoutine}>
                     <input
                       id="daily-routine"
                       type="text"
-                      value={isPresetRoutine ? "" : routineInput}
+                      value={isCustomRoutine ? storedRoutine ?? "" : ""}
                       placeholder="직접 입력"
+                      maxLength={MAX_ROUTINE_LENGTH}
                       aria-label="오늘의 운동"
-                      onChange={(event) => updateRoutine(event.target.value)}
+                      onChange={(event) => updateRoutine(event.target.value, "custom")}
                     />
+                    <span className="workout-row-mark" aria-hidden="true">{isCustomRoutine && <CheckIcon />}</span>
                   </label>
                 </div>
 
@@ -720,7 +928,6 @@ export function SweatStampApp() {
                   className="sr-only"
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   aria-label="운동 사진 선택"
                   onChange={handlePhotoChange}
                 />
@@ -759,7 +966,7 @@ export function SweatStampApp() {
                 {saveError && <p className="text-sm font-medium text-destructive" role="alert">{saveError}</p>}
 
                 <button type="button" className="certify-button" disabled={!canCertify || isSaving} onClick={certifyToday}>
-                  <span>{isSaving ? "도장 찍는 중" : `오늘 ${routine} 완료 · 도장 찍기`}</span>
+                  <span className="certify-button-label">{isSaving ? "도장 찍는 중" : `오늘 ${routine} 완료 · 도장 찍기`}</span>
                   <span className="certify-button-icon" aria-hidden="true"><ArrowRightIcon /></span>
                 </button>
               </section>

@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   WEEKDAY_LABELS,
+  countCertificationsInMonth,
   formatDayLabel,
+  getCertificationKey,
+  getMonthStart,
+  parseCertificationKey,
   getLocalDateKey,
   getMonthCalendarDays,
   getWeekDateKeys,
@@ -72,5 +76,24 @@ describe("certification calendar", () => {
 
     expect(formatDayLabel(lateEveningInSeoul, "Asia/Seoul")).toBe("SAT · NOV 14");
     expect(formatDayLabel(lateEveningInSeoul, "Australia/Sydney")).toBe("SUN · NOV 15");
+  });
+
+  it("builds and parses certification keys", () => {
+    expect(getCertificationKey("sam", "2026-11-14")).toBe("2026-11-14:sam");
+    expect(parseCertificationKey("2026-11-14:sam")).toEqual({ dateKey: "2026-11-14", memberId: "sam" });
+  });
+
+  it("counts one member's certifications in a month", () => {
+    const keys = ["2026-11-01:sam", "2026-11-30:sam", "2026-12-01:sam", "2026-11-02:taem"];
+
+    expect(countCertificationsInMonth(keys, "sam", new Date(2026, 10, 1))).toBe(2);
+    expect(countCertificationsInMonth(keys, "sam", new Date(2026, 11, 1))).toBe(1);
+    expect(countCertificationsInMonth(keys, "taem", new Date(2026, 11, 1))).toBe(0);
+  });
+
+  it("finds the first day of a date key's month", () => {
+    const start = getMonthStart("2026-11-14");
+
+    expect([start.getFullYear(), start.getMonth(), start.getDate()]).toEqual([2026, 10, 1]);
   });
 });

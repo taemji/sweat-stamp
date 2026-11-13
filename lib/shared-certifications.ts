@@ -3,6 +3,11 @@ import { getSupabaseClient, isSupabaseConfigured } from "./supabase-client";
 
 const photoBucketName = "certification-photos";
 
+// Matches the char_length(routine) check in supabase/migrations.
+export const MAX_ROUTINE_LENGTH = 120;
+const pageSize = 1000;
+const maxPages = 20;
+
 interface CertificationRow {
   completed_at: string;
   member_id: string;
@@ -23,7 +28,6 @@ interface SaveSharedCertificationInput {
   completedAt: string;
   memberId: MemberId;
   photo: File;
-  previousPhotoPath?: string;
   routine: string;
   workoutDate: string;
 }
@@ -66,17 +70,30 @@ function requireSupabaseClient() {
 
 export async function loadSharedCertifications() {
   const supabase = requireSupabaseClient();
-  const { data, error } = await supabase
-    .from("certifications")
-    .select("member_id, workout_date, routine, photo_path, completed_at")
-    .order("workout_date", { ascending: true })
-    .limit(1000);
+  const rows: CertificationRow[] = [];
 
-  if (error) {
-    throw new Error(error.message);
+  // The API returns at most 1000 rows per request, so read newest first in pages.
+  for (let page = 0; page < maxPages; page += 1) {
+    const from = page * pageSize;
+    const { data, error } = await supabase
+      .from("certifications")
+      .select("member_id, workout_date, routine, photo_path, completed_at")
+      .order("workout_date", { ascending: false })
+      .order("member_id", { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    rows.push(...((data ?? []) as CertificationRow[]));
+
+    if (!data || data.length < pageSize) {
+      break;
+    }
   }
 
-  return mapCertificationRows((data ?? []) as CertificationRow[]);
+  return mapCertificationRows(rows);
 }
 
 export async function saveSharedCertification(input: SaveSharedCertificationInput) {
@@ -110,8 +127,15 @@ export async function saveSharedCertification(input: SaveSharedCertificationInpu
     throw new Error(certificationError.message);
   }
 
-  if (input.previousPhotoPath && input.previousPhotoPath !== photoPath) {
-    await photoBucket.remove([input.previousPhotoPath]);
+  // Remove earlier photos for the same member and day; the row now points at the new one.
+  const dayFolder = `${input.memberId}/${input.workoutDate}`;
+  const { data: dayFiles } = await photoBucket.list(dayFolder);
+  const stalePaths = (dayFiles ?? [])
+    .map((file) => `${dayFolder}/${file.name}`)
+    .filter((path) => path !== photoPath);
+
+  if (stalePaths.length > 0) {
+    await photoBucket.remove(stalePaths);
   }
 
   return {
@@ -123,7 +147,7 @@ export async function saveSharedCertification(input: SaveSharedCertificationInpu
   } satisfies SharedCertification;
 }
 
-export async function deleteSharedCertification(certification: SharedCertification) {
+export async function deleteSharedCertification(certification: Pick<SharedCertification, "memberId" | "photoPath" | "workoutDate">) {
   const supabase = requireSupabaseClient();
   const { error: deleteError } = await supabase
     .from("certifications")

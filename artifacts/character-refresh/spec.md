@@ -16,7 +16,7 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 ## Scenarios
 
 ### S1. Header and navigation
-- The header shows `Sweat Stamp`. A storage notice appears only when shared storage failed (`공동 저장에 연결하지 못해 이 기기에만 저장돼요`). Without Supabase configuration (local development) the app saves on the device without a notice.
+- The header shows `Sweat Stamp`. A notice appears only when shared storage cannot be reached (`인터넷 연결이 불안정해요. 지금 찍는 도장은 친구들에게 아직 안 보여요.`). Stamps made then, or whose upload fails, are kept on the device and uploaded automatically: every 30 seconds while offline and as soon as the browser is back online. If the server already has a stamp for the same member and day, the earlier stamp is kept. While offline, the shared calendar says `친구들 기록을 불러오지 못했어요.` instead of a team count. Without Supabase configuration (local development) the app saves on the device without a notice.
 - The navigation shows each member's face. The selected member also shows their name, and members who certified today show a check labelled `인증 완료`.
 - The calendar button opens the shared calendar.
 
@@ -26,18 +26,20 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 - A Monday-to-Sunday strip shows this week's certified days, labelled `이번 주 <n>회 인증`.
 
 ### S3. Choosing the workout
-- The main workout is selected by default. Rows `01 MAIN <main>`, `02 SUB Stretching`, and a `03` field labelled `오늘의 운동` (placeholder `직접 입력`) choose the workout.
+- The main workout is selected by default. Rows `<main>`, `Stretching`, and a field labelled `오늘의 운동` (placeholder `직접 입력`, up to 120 characters) choose the workout. The selected row, including the field, shows a check.
+- Text typed into the field stays as typed even when it starts with a preset name (for example `Pilates reformer`).
 - A typed workout is kept for the day it was entered. On a later day, or when the field is cleared, the main workout is selected again. Routines saved without a date are ignored.
 
 ### S4. Certifying
-- One button, `오늘 <workout> 완료 · 도장 찍기`, certifies the workout. It is disabled only while shared storage is connecting, with the hint `공동 저장에 연결하는 중이에요.` above it.
+- One button, `오늘 <workout> 완료 · 도장 찍기`, certifies the workout. Long workout names are cut with an ellipsis on one line. 
+- `내 사진으로 바꾸기` lets the member take a photo or pick one from the album.
 - With no photo selected, the photo area shows the main workout illustration with a preview of the stamp, and certifying saves that illustration with the `SWEAT STAMP`, member name, and date-time stamp.
 - Choosing a camera or album photo stamps and saves that photo instead.
 - After certifying, the sheet shows the stamped photo (`<NAME>의 오늘 운동 사진`), the workout, `<time>에 찍은 도장`, and a `다시 인증` button.
 
 ### S5. Shared calendar
 - The hero says how many members certified today: `오늘 첫 도장은 누가 찍을까요?`, `<total>명 중 <n>명이 도장 찍었어요.`, or `오늘은 모두 해냈어요.`
-- Below the greeting, the four characters from `team_lineup.png` stand in a row. Characters who certified today are shown in full color, the others are faded, and tapping a character opens that member's screen. Each character shows this month's count under their feet.
+- Below the greeting, the four characters from `team_lineup.png` stand in a row. Characters who certified today are shown in full color, the others are faded, and tapping a character opens that member's screen. Each character shows their count for the month shown in the calendar below, so the counts follow `이전 달` and `다음 달`.
 - The month grid starts on Monday, shows only the weeks it needs, and marks each day with a dot per certified member. There is no separate per-member list.
 
 ### S6. App icon and share image
@@ -47,8 +49,10 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 ### S7. Time zones and loading
 - Each member's day, stamp times, weekly strip, and today's status use their own time zone (SAM: Australia/Sydney; others: Asia/Seoul). Calendar dots and monthly counts file each certification under the member's own date, so a SAM stamp just after Sydney midnight on the 1st counts toward the new month even while Seoul is still on the previous day.
 - The shared calendar opens on the current month in Seoul and marks Seoul's today.
-- Until stored certifications have loaded, the screens show `오늘 기록을 불러오는 중이에요.` instead of counts, statuses, or the certify form.
-- `다시 인증` on a shared certification is refused with `공동 저장에 연결된 뒤 다시 시도해 주세요.` while shared storage is unavailable.
+- Until stored certifications have loaded, the screens show `오늘 기록을 불러오는 중이에요.` instead of counts, statuses, or the certify form. Loading gives up after 10 seconds and continues offline.
+- The workout date is the member's date at the time on the stamp, so the photo and the record always agree.
+- `다시 인증` on a shared certification is refused with `인터넷에 다시 연결된 뒤 시도해 주세요.` while shared storage is unreachable.
+- Stamp times read like `오전 6:33`, on the photo and in `<time>에 찍은 도장`.
 
 ## Success Criteria
 

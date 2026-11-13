@@ -25,7 +25,7 @@ This is a mobile-first Sweat Stamp photo certification app built with Next.js 16
 - Follow the existing visual system in `app/globals.css`: member theme tokens (`--member-accent`, `--member-tint`, `--member-ink`), Pretendard for Korean, Bricolage Grotesque (`font-display`) for English, and person-specific accents.
 - Prefer Lucide icons for actions and existing shadcn/ui components for controls.
 - Preserve accessibility affordances already present: semantic headings, labels, `aria-live` where useful, and role/name-friendly controls for Playwright tests.
-- Camera capture, Supabase, and IndexedDB fallback are runtime capabilities. Keep album selection, remote errors, and local fallback paths working.
+- The photo picker (camera or album), Supabase, and the IndexedDB fallback are runtime capabilities. Keep both camera and album selection, remote errors, offline queuing, and local fallback paths working.
 
 ## Architecture Map
 
@@ -52,7 +52,7 @@ Respect the dependency direction in `CLAUDE.md`: lower-level modules should not 
 
 - Install dependencies: `bun install`
 - Development server: `bun dev`
-- HTTPS LAN development server for physical phone sensor testing: `bun run dev:https`
+- HTTPS LAN development server for testing the camera on a physical phone: `bun run dev:https`
   - If LAN IP auto-detection picks the wrong interface, set `LAN_IP=<address>` before running the command.
 - Lint: `bun run lint`
 - Unit/integration tests: `bun run test`
@@ -90,9 +90,9 @@ When a feature artifact exists, treat `artifacts/<feature>/spec.md` as the behav
 
 Recent history mostly follows Conventional Commit style, especially:
 
-- `feat: add squat coach app flow`
-- `fix: detect squat reps from vertical phone motion`
-- `style: refine squat coach interface`
+- `feat: replace characters and redesign member screens`
+- `fix: reset custom workouts daily and hide the normal sync label`
+- `feat: simplify certifying and keep SAM on Sydney time`
 
 Some older asset-only commits are plain imperative messages such as `update app icon` or `change background, icon image`, but new commits should prefer Conventional Commits: `feat:`, `fix:`, `style:`, `test:`, `docs:`, `refactor:`, or `chore:`.
 

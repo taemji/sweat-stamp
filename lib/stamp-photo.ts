@@ -15,14 +15,7 @@ export function formatStampDateTime(stampedAt: Date, timeZone?: string) {
     month: "2-digit",
     day: "2-digit",
   }).format(stampedAt);
-  const time = new Intl.DateTimeFormat("ko-KR", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(stampedAt);
-
-  return `${date} ${time}`;
+  return `${date} ${formatStampTime(stampedAt, timeZone)}`;
 }
 
 export function formatStampTime(stampedAt: Date, timeZone?: string) {

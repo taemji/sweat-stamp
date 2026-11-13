@@ -315,6 +315,15 @@
     word-break: keep-all;
   }
 
+  .hero-workout {
+    display: inline-block;
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+    white-space: nowrap;
+  }
+
   .hero-line b {
     color: var(--member-ink);
     font-family: var(--font-display);
@@ -468,7 +477,8 @@
     text-align: left;
   }
 
-  .workout-row[aria-pressed="true"] {
+  .workout-row[aria-pressed="true"],
+  .workout-row[data-selected="true"] {
     border-bottom: 1.5px solid var(--member-ink);
     color: var(--member-ink);
   }
@@ -494,7 +504,8 @@
     border-radius: 50%;
   }
 
-  .workout-row[aria-pressed="true"] .workout-row-mark {
+  .workout-row[aria-pressed="true"] .workout-row-mark,
+  .workout-row[data-selected="true"] .workout-row-mark {
     border-color: var(--member-ink);
     background: var(--member-ink);
     color: white;
@@ -507,7 +518,6 @@
   }
 
   .workout-row-custom {
-    justify-content: flex-start;
     cursor: text;
   }
 
@@ -646,11 +656,19 @@
     text-align: center;
   }
 
+  .certify-button-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .certify-button {
     display: flex;
     min-height: 3.75rem;
     align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
     margin-top: 0.35rem;
     padding: 0 0.5rem 0 1.5rem;
     border-radius: 999px;
@@ -791,10 +809,6 @@
   .calendar-day:nth-child(7n),
   .calendar-day:nth-child(7n - 1) {
     color: #a8a29d;
-  }
-
-  .calendar-day-empty {
-    opacity: 0.18;
   }
 
   .calendar-date {

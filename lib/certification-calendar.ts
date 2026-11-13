@@ -3,6 +3,29 @@ export interface CalendarDay {
   dayNumber: number | null;
 }
 
+export function getCertificationKey(memberId: string, dateKey: string) {
+  return `${dateKey}:${memberId}`;
+}
+
+export function parseCertificationKey(key: string) {
+  const [dateKey, memberId] = key.split(":");
+  return { dateKey, memberId };
+}
+
+export function countCertificationsInMonth(keys: string[], memberId: string, month: Date) {
+  const monthPrefix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-`;
+
+  return keys.filter((key) => {
+    const parsed = parseCertificationKey(key);
+    return parsed.memberId === memberId && parsed.dateKey.startsWith(monthPrefix);
+  }).length;
+}
+
+export function getMonthStart(dateKey: string) {
+  const [year, month] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, 1);
+}
+
 export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 
 export function getLocalDateKey(date = new Date(), timeZone?: string) {

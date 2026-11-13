@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+function seoulDatePart(part: "day" | "month") {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", [part]: "numeric" }).format(new Date());
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await page.evaluate(async () => {
@@ -19,9 +23,13 @@ test("home opens the shared calendar before member screens", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Sweat Stamp" })).toBeVisible();
   await expect(page.getByRole("status")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "전체 캘린더" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByLabel("공동 인증 캘린더")).toBeVisible();
+  await expect(page.getByLabel("도장 캘린더")).toBeVisible();
   await expect(page.getByRole("heading", { name: "오늘 첫 도장은 누가 찍을까요?" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "TAEM 오늘 인증 전, 이번 달 0회, 인증 화면 열기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: `TAEM 오늘 인증 전, ${seoulDatePart("month")}월 0회, 인증 화면 열기` })).toBeVisible();
+  await page.getByRole("button", { name: "다음 달" }).click();
+  const nextMonth = (Number(seoulDatePart("month")) % 12) + 1;
+  await expect(page.getByRole("button", { name: `TAEM 오늘 인증 전, ${nextMonth}월 0회, 인증 화면 열기` })).toBeVisible();
+  await page.getByRole("button", { name: "이전 달" }).click();
   await expect(page.getByRole("button", { name: "이전 달" })).toBeVisible();
   await expect(page.getByRole("button", { name: "다음 달" })).toBeVisible();
 
@@ -60,6 +68,13 @@ test("main workout is preset and stretching is one tap away", async ({ page }) =
   await page.getByRole("button", { name: "TAEM 선택" }).click();
   await page.getByLabel("오늘의 운동").fill("Barre");
   await expect(page.getByRole("button", { name: "Stretching", exact: true })).toHaveAttribute("aria-pressed", "false");
+
+  await page.getByRole("button", { name: "SAM 선택" }).click();
+  const workoutField = page.getByLabel("오늘의 운동");
+  await workoutField.pressSequentially("Pilates reformer");
+  await expect(workoutField).toHaveValue("Pilates reformer");
+  await expect(page.getByRole("button", { name: "Pilates", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(workoutField).toHaveAttribute("maxlength", "120");
 });
 
 test("certifying without a photo stamps the main workout illustration", async ({ page }) => {
@@ -69,6 +84,7 @@ test("certifying without a photo stamps the main workout illustration", async ({
   await expect(page.getByLabel("이번 주 0회 인증")).toBeVisible();
   await expect(page.getByRole("img", { name: "YOOM 기본 인증 이미지" })).toBeVisible();
   await expect(page.getByRole("button", { name: "내 사진으로 바꾸기" })).toBeVisible();
+  await expect(page.getByLabel("운동 사진 선택")).not.toHaveAttribute("capture");
 
   const certifyButton = page.getByRole("button", { name: "오늘 Diet Dance 완료 · 도장 찍기" });
   await expect(certifyButton).toBeEnabled();
@@ -76,7 +92,6 @@ test("certifying without a photo stamps the main workout illustration", async ({
 
   await expect(page.getByRole("heading", { name: "오늘도 해냈어요." })).toBeVisible();
   await expect(page.locator(".certification-complete").getByText("Diet Dance")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "오늘도 해냈어요." })).toBeVisible();
   await expect(page.getByText("첫 번째 도장이에요.")).toBeVisible();
   await expect(page.getByLabel("이번 주 1회 인증")).toBeVisible();
   await page.reload();
@@ -201,16 +216,16 @@ test("a picked photo is stamped and certifies today", async ({ page }) => {
   await certifyButton.click();
 
   await expect(page.getByRole("heading", { name: "오늘도 해냈어요." })).toBeVisible();
-  await expect(page.getByRole("button", { name: "TAEM 선택" }).getByLabel("인증 완료")).toBeVisible();
+  await expect(page.getByRole("button", { name: "TAEM 선택, 오늘 인증 완료" })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("공동 인증 캘린더")).toBeVisible();
+  await expect(page.getByLabel("도장 캘린더")).toBeVisible();
   await page.getByRole("button", { name: "TAEM 선택" }).click();
   await expect(page.getByRole("img", { name: "TAEM의 오늘 운동 사진" })).toBeVisible();
 
   await page.getByRole("button", { name: "전체 캘린더" }).click();
-  const todayNumber = String(new Date().getDate());
+  const todayNumber = seoulDatePart("day");
   await expect(page.getByLabel(`${todayNumber}일, TAEM 인증 완료`)).toBeVisible();
   await expect(page.getByRole("heading", { name: "4명 중 1명이 도장 찍었어요." })).toBeVisible();
   await expect(page.getByText("남은 세 명도 같이 가 볼까요?")).toBeVisible();
-  await expect(page.getByRole("button", { name: "TAEM 오늘 인증 완료, 이번 달 1회, 인증 화면 열기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: `TAEM 오늘 인증 완료, ${seoulDatePart("month")}월 1회, 인증 화면 열기` })).toBeVisible();
 });

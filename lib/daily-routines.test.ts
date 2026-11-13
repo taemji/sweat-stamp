@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createDailyRoutines, readDailyRoutines } from "./daily-routines";
+import { createDailyRoutines, readDailyCustomIds, readDailyRoutines } from "./daily-routines";
 
 describe("daily routines", () => {
   it("keeps routines saved today", () => {
@@ -24,5 +24,14 @@ describe("daily routines", () => {
     const stored = { dateKey: "2026-11-14", routines: { taem: "Barre", sam: 3, sook: "", yoom: "  " } };
 
     expect(readDailyRoutines(stored, "2026-11-14")).toEqual({ taem: "Barre" });
+  });
+
+  it("remembers which members typed their own workout today", () => {
+    const stored = createDailyRoutines({ taem: "Ballet", sam: "Pilates reformer" }, "2026-11-14", ["taem", "sook"]);
+
+    expect(stored.custom).toEqual(["taem"]);
+    expect(readDailyCustomIds(stored, "2026-11-14")).toEqual(["taem"]);
+    expect(readDailyCustomIds(stored, "2026-11-15")).toEqual([]);
+    expect(readDailyCustomIds({ dateKey: "2026-11-14", routines: { taem: "Ballet" } }, "2026-11-14")).toEqual([]);
   });
 });
