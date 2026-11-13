@@ -168,17 +168,6 @@
     font-weight: 500;
   }
 
-  .today-count {
-    flex: 0 0 auto;
-    padding: 0.4rem 0.8rem;
-    border-radius: 999px;
-    background: var(--member-ink);
-    color: white;
-    font-family: var(--font-display);
-    font-size: 0.8rem;
-    font-weight: 700;
-  }
-
   .member-nav {
     display: flex;
     align-items: center;
@@ -261,7 +250,7 @@
     height: 1.15rem;
   }
 
-  .member-hero {
+  .stamp-hero {
     position: relative;
     height: 22.5rem;
     flex: 0 0 auto;
@@ -280,46 +269,7 @@
     animation: member-character-enter 320ms ease-out;
   }
 
-  .team-hero-image {
-    position: absolute;
-    right: -0.75rem;
-    bottom: -0.4rem;
-    width: 15rem;
-    height: 15rem;
-    object-fit: cover;
-    mask-image: linear-gradient(to right, transparent, #000 14%), linear-gradient(to bottom, transparent, #000 12%);
-    mask-composite: intersect;
-  }
-
-  .team-strip {
-    display: flex;
-    gap: 0.55rem;
-  }
-
-  .team-strip-member {
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    box-shadow: 0 0 0 2px white, 0 0 0 3.5px #d9d3cc;
-  }
-
-  .team-strip-member img {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    object-fit: cover;
-    opacity: 0.55;
-  }
-
-  .team-strip-member[data-done="true"] {
-    box-shadow: 0 0 0 2px white, 0 0 0 3.5px var(--chip-accent);
-  }
-
-  .team-strip-member[data-done="true"] img {
-    opacity: 1;
-  }
-
-  .member-hero-copy {
+  .hero-copy {
     position: absolute;
     z-index: 1;
     top: 1.4rem;
@@ -330,7 +280,7 @@
     gap: 0.75rem;
   }
 
-  .member-hero-date {
+  .hero-date {
     color: var(--member-accent);
     font-family: var(--font-display);
     font-size: 0.75rem;
@@ -338,7 +288,7 @@
     letter-spacing: 0.1em;
   }
 
-  .member-hero-title {
+  .hero-title {
     font-size: 2.1rem;
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -346,24 +296,16 @@
     word-break: keep-all;
   }
 
-  .team-hero-copy {
-    width: 13.5rem;
-  }
-
-  .team-hero-copy .member-hero-title {
-    font-size: 1.85rem;
-  }
-
-  .member-hero-title .font-display {
+  .hero-title .font-display {
     font-weight: 600;
     letter-spacing: -0.01em;
   }
 
-  .member-hero-dot {
+  .hero-dot {
     color: var(--member-accent);
   }
 
-  .member-hero-line {
+  .hero-line {
     color: color-mix(in srgb, var(--member-ink) 72%, transparent);
     font-size: 0.95rem;
     font-weight: 500;
@@ -371,13 +313,53 @@
     word-break: keep-all;
   }
 
-  .member-hero-line b {
+  .hero-line b {
     color: var(--member-ink);
     font-family: var(--font-display);
     font-weight: 600;
   }
 
-  .week-strip {
+  .team-hero {
+    display: flex;
+    height: auto;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.4rem 0 0.75rem;
+    overflow: visible;
+  }
+
+  .team-hero .hero-copy {
+    position: static;
+    width: auto;
+    padding: 0 1.25rem;
+  }
+
+  .team-lineup {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.2rem;
+    margin: 0 0.6rem;
+  }
+
+  .team-lineup-member {
+    min-width: 0;
+    flex: 1 1 0;
+    padding: 0;
+  }
+
+  .team-lineup-member img {
+    display: block;
+    width: 100%;
+    height: auto;
+    opacity: 0.45;
+    transition: opacity 200ms ease;
+  }
+
+  .team-lineup-member[data-done="true"] img {
+    opacity: 1;
+  }
+
+  .hero-panel {
     position: absolute;
     z-index: 1;
     bottom: 1.4rem;
@@ -391,7 +373,7 @@
     backdrop-filter: blur(6px);
   }
 
-  .week-strip-head {
+  .hero-panel-head {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
@@ -400,10 +382,6 @@
     font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
-  }
-
-  .week-strip-head span:last-child {
-    color: var(--member-ink);
   }
 
   .week-strip-days {

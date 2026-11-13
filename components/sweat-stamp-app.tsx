@@ -15,7 +15,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
-  formatKoreanOrdinal,
+  WEEKDAY_LABELS,
   getLocalDateKey,
   getMonthCalendarDays,
   getWeekDateKeys,
@@ -29,8 +29,10 @@ import {
 } from "@/lib/certification-photo-store";
 import { createDailyRoutines, readDailyRoutines } from "@/lib/daily-routines";
 import { loadDefaultWorkoutPhoto } from "@/lib/default-workout-photo";
+import { formatKoreanHeadcount, formatKoreanOrdinal } from "@/lib/korean-format";
 import {
   MEMBER_PROFILES,
+  TEAM_THEME,
   getMemberProfile,
   isMemberId,
   type MemberId,
@@ -49,7 +51,7 @@ import {
   subscribeToSharedCertifications,
   type SharedCertification,
 } from "@/lib/shared-certifications";
-import { createStampedPhoto, formatStampDateTime } from "@/lib/stamp-photo";
+import { createStampedPhoto, formatStampDateTime, formatStampTime } from "@/lib/stamp-photo";
 import { isSupabaseConfigured } from "@/lib/supabase-client";
 
 interface Certification {
@@ -66,14 +68,6 @@ type CertificationMap = Record<string, Certification>;
 type RoutineMap = Partial<Record<MemberId, string>>;
 type AppView = "calendar" | MemberId;
 type SyncStatus = "connecting" | "error" | "local" | "shared";
-
-const weekdayLabels = ["월", "화", "수", "목", "금", "토", "일"];
-const koreanCounts = ["한", "두", "세", "네"];
-const stampTimeFormatter = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit" });
-
-function formatStampTime(completedAt: string) {
-  return stampTimeFormatter.format(new Date(completedAt));
-}
 
 const selectedMemberStorageKey = "sweat-stamp:selected-member";
 const routinesStorageKey = "sweat-stamp:routines";
@@ -147,7 +141,7 @@ function CalendarOverview({
 
       <div className="calendar-board">
         <div className="calendar-weekdays" aria-hidden="true">
-          {weekdayLabels.map((weekday) => <span key={weekday}>{weekday}</span>)}
+          {WEEKDAY_LABELS.map((weekday) => <span key={weekday}>{weekday}</span>)}
         </div>
         <div className="calendar-grid">
           {calendarDays.map((day, index) => {
@@ -228,7 +222,7 @@ export function SweatStampApp() {
     dateKey,
     isDone: Boolean(certifications[getCertificationKey(selectedMemberId, dateKey)]),
     isToday: dateKey === todayKey,
-    label: weekdayLabels[index],
+    label: WEEKDAY_LABELS[index],
   }));
   const weeklyStampCount = weekDays.filter((day) => day.isDone).length;
   const heroDateParts = Object.fromEntries(
@@ -237,24 +231,27 @@ export function SweatStampApp() {
       .map((part) => [part.type, part.value.toUpperCase()]),
   );
   const heroDateLabel = `${heroDateParts.weekday} · ${heroDateParts.month} ${heroDateParts.day}`;
+  const memberCount = MEMBER_PROFILES.length;
+  const todayDoneMembers = MEMBER_PROFILES.filter((member) => certifications[getCertificationKey(member.id, todayKey)]);
+  const todayDoneIds = new Set<MemberId>(todayDoneMembers.map((member) => member.id));
+  const remainingMemberCount = memberCount - todayDoneMembers.length;
+  const isStorageReady = hasHydrated && syncStatus !== "connecting";
   const syncNotice = syncStatus === "error"
     ? "공동 저장에 연결하지 못해 이 기기에만 저장돼요"
     : syncStatus === "local"
       ? "이 기기에 저장"
       : "";
-  const todayDoneMembers = MEMBER_PROFILES.filter((member) => certifications[getCertificationKey(member.id, todayKey)]);
-  const remainingMemberCount = MEMBER_PROFILES.length - todayDoneMembers.length;
-  const certifyHint = !routine.trim()
-    ? "오늘 한 운동을 골라 주세요."
+  const certifyHint = !isStorageReady
+    ? "공동 저장에 연결하는 중이에요."
     : !routineChecked
       ? "운동 완료를 체크하면 도장을 찍을 수 있어요."
       : "";
-  const canCertify = routine.trim().length > 0 && routineChecked && !isProcessingPhoto;
+  const canCertify = isStorageReady && routineChecked && !isProcessingPhoto;
   const isCalendarView = activeView === "calendar";
   const themeStyle = {
-    "--member-accent": isCalendarView ? "#94650f" : selectedMember.accent,
-    "--member-tint": isCalendarView ? "#fef2c9" : selectedMember.accentSoft,
-    "--member-ink": isCalendarView ? "#1c1a19" : selectedMember.ink,
+    "--member-accent": isCalendarView ? TEAM_THEME.accent : selectedMember.accent,
+    "--member-tint": isCalendarView ? TEAM_THEME.accentSoft : selectedMember.accentSoft,
+    "--member-ink": isCalendarView ? TEAM_THEME.ink : selectedMember.ink,
   } as CSSProperties;
 
   useEffect(() => {
@@ -381,6 +378,15 @@ export function SweatStampApp() {
     };
   }, [certificationKey, completedCertification, syncStatus]);
 
+  function stampForSelectedMember(photo: File, stampedAt: Date) {
+    return createStampedPhoto(photo, {
+      accent: selectedMember.accent,
+      fontFamily: getStampFontFamily(),
+      memberName: selectedMember.name,
+      stampedAt,
+    });
+  }
+
   function selectMember(memberId: MemberId) {
     setSelectedMemberId(memberId);
     setActiveView(memberId);
@@ -401,12 +407,7 @@ export function SweatStampApp() {
     setSaveError("");
 
     try {
-      const stampedPhoto = await createStampedPhoto(file, {
-        accent: selectedMember.accent,
-        fontFamily: getStampFontFamily(),
-        memberName: selectedMember.name,
-        stampedAt,
-      });
+      const stampedPhoto = await stampForSelectedMember(file, stampedAt);
       setPhotoPreview({ file: stampedPhoto, stampedAt, url: URL.createObjectURL(stampedPhoto) });
     } catch (error) {
       setPhotoPreview(null);
@@ -414,6 +415,20 @@ export function SweatStampApp() {
     } finally {
       setIsProcessingPhoto(false);
     }
+  }
+
+  function updateRoutine(nextRoutine: string) {
+    setRoutines((currentRoutines) => {
+      const nextRoutines = { ...currentRoutines };
+
+      if (nextRoutine.trim()) {
+        nextRoutines[selectedMemberId] = nextRoutine;
+      } else {
+        delete nextRoutines[selectedMemberId];
+      }
+
+      return nextRoutines;
+    });
   }
 
   function clearPhoto() {
@@ -433,12 +448,7 @@ export function SweatStampApp() {
 
       if (!certificationPhoto) {
         const stampedAt = new Date();
-        const stampedPhoto = await createStampedPhoto(await loadDefaultWorkoutPhoto(selectedMember), {
-          accent: selectedMember.accent,
-          fontFamily: getStampFontFamily(),
-          memberName: selectedMember.name,
-          stampedAt,
-        });
+        const stampedPhoto = await stampForSelectedMember(await loadDefaultWorkoutPhoto(selectedMember), stampedAt);
         certificationPhoto = { file: stampedPhoto, stampedAt, url: "" };
       }
 
@@ -508,15 +518,12 @@ export function SweatStampApp() {
             <h1 className="stamp-wordmark">Sweat Stamp</h1>
             {syncNotice && <p className="stamp-meta" role={syncStatus === "error" ? "status" : undefined}>{syncNotice}</p>}
           </div>
-          <p className="today-count" aria-label="오늘 인증 수">
-            {MEMBER_PROFILES.filter((member) => certifications[getCertificationKey(member.id, todayKey)]).length} / 4 DONE
-          </p>
         </header>
 
         <nav className="member-nav" aria-label="화면 선택">
           {MEMBER_PROFILES.map((member) => {
             const isSelected = member.id === activeView;
-            const isComplete = Boolean(certifications[getCertificationKey(member.id, todayKey)]);
+            const isComplete = todayDoneIds.has(member.id);
 
             return (
               <button
@@ -553,71 +560,62 @@ export function SweatStampApp() {
 
         {isCalendarView ? (
           <>
-            <section className="member-hero" aria-labelledby="team-heading">
-              <Image
-                className="team-hero-image"
-                src="/characters/team.webp"
-                alt="네 캐릭터가 함께 운동하는 모습"
-                width={900}
-                height={900}
-                sizes="15rem"
-                priority
-              />
-              <div className="member-hero-copy team-hero-copy">
-                <p className="member-hero-date">{heroDateLabel}</p>
-                <h2 id="team-heading" className="member-hero-title">
+            <section className="stamp-hero team-hero" aria-labelledby="team-heading">
+              <div className="hero-copy">
+                <p className="hero-date">{heroDateLabel}</p>
+                <h2 id="team-heading" className="hero-title">
                   {todayDoneMembers.length === 0
                     ? <>오늘 첫 도장은<br />누가 찍을까요</>
                     : remainingMemberCount === 0
                       ? <>오늘은 모두<br />해냈어요</>
-                      : <>4명 중 {todayDoneMembers.length}명이<br />도장 찍었어요</>}
-                  <span className="member-hero-dot">{todayDoneMembers.length === 0 ? "?" : "."}</span>
+                      : <>{memberCount}명 중 {todayDoneMembers.length}명이<br />도장 찍었어요</>}
+                  <span className="hero-dot">{todayDoneMembers.length === 0 ? "?" : "."}</span>
                 </h2>
-                <p className="member-hero-line">
+                <p className="hero-line">
                   {todayDoneMembers.length === 0
-                    ? "네 명 모두 아직이에요."
+                    ? `${formatKoreanHeadcount(memberCount)} 모두 아직이에요.`
                     : remainingMemberCount === 0
-                      ? "네 명 모두 도장을 찍었어요."
-                      : `남은 ${koreanCounts[remainingMemberCount - 1]} 명도 같이 가 볼까요?`}
+                      ? `${formatKoreanHeadcount(memberCount)} 모두 도장을 찍었어요.`
+                      : `남은 ${formatKoreanHeadcount(remainingMemberCount)}도 같이 가 볼까요?`}
                 </p>
               </div>
-              <div className="week-strip" aria-label={`오늘 ${todayDoneMembers.length}명 인증`}>
-                <p className="week-strip-head" aria-hidden="true">
-                  <span>Today</span>
-                  <span>{todayDoneMembers.length} / 4</span>
-                </p>
-                <div className="team-strip">
-                  {MEMBER_PROFILES.map((member) => {
-                    const isDone = todayDoneMembers.includes(member);
+              <div className="team-lineup" role="group" aria-label={`오늘 ${todayDoneMembers.length}명 인증`}>
+                {MEMBER_PROFILES.map((member) => {
+                  const isDone = todayDoneIds.has(member.id);
 
-                    return (
-                      <button
-                        key={member.id}
-                        type="button"
-                        className="team-strip-member"
-                        data-done={isDone}
-                        style={{ "--chip-accent": member.accent } as CSSProperties}
-                        aria-label={`${member.name} ${isDone ? "오늘 인증 완료" : "오늘 인증 전"}, 인증 화면 열기`}
-                        onClick={() => selectMember(member.id)}
-                      >
-                        <Image src={member.avatar} alt="" width={64} height={64} />
-                      </button>
-                    );
-                  })}
-                </div>
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      className="team-lineup-member"
+                      data-done={isDone}
+                      style={{ flexGrow: member.lineup.width }}
+                      aria-label={`${member.name} ${isDone ? "오늘 인증 완료" : "오늘 인증 전"}, 인증 화면 열기`}
+                      onClick={() => selectMember(member.id)}
+                    >
+                      <Image
+                        src={member.lineup.src}
+                        alt=""
+                        width={member.lineup.width}
+                        height={member.lineup.height}
+                        priority
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </section>
             <CalendarOverview
-            certifications={certifications}
-            todayKey={todayKey}
-            visibleMonth={visibleMonth}
-            onChangeMonth={(offset) => setVisibleMonth((currentMonth) => shiftMonth(currentMonth, offset))}
-            onSelectMember={selectMember}
+              certifications={certifications}
+              todayKey={todayKey}
+              visibleMonth={visibleMonth}
+              onChangeMonth={(offset) => setVisibleMonth((currentMonth) => shiftMonth(currentMonth, offset))}
+              onSelectMember={selectMember}
             />
           </>
         ) : (
           <>
-            <section className="member-hero" aria-labelledby="member-heading">
+            <section className="stamp-hero" aria-labelledby="member-heading">
               <Image
                 key={selectedMember.id}
                 className="member-hero-character"
@@ -628,28 +626,28 @@ export function SweatStampApp() {
                 sizes="15rem"
                 priority
               />
-              <div className="member-hero-copy">
-                <p className="member-hero-date">{heroDateLabel}{completedCertification ? " · DONE" : ""}</p>
+              <div className="hero-copy">
+                <p className="hero-date">{heroDateLabel}{completedCertification ? " · DONE" : ""}</p>
                 {completedCertification ? (
                   <>
-                    <h2 id="member-heading" className="member-hero-title">오늘도<br />해냈어요<span className="member-hero-dot">.</span></h2>
-                    <p className="member-hero-line">
+                    <h2 id="member-heading" className="hero-title">오늘도<br />해냈어요<span className="hero-dot">.</span></h2>
+                    <p className="hero-line">
                       <b>{selectedMember.name}</b>의 이번 주<br />{formatKoreanOrdinal(weeklyStampCount)} 도장이에요.
                     </p>
                   </>
                 ) : (
                   <>
-                    <h2 id="member-heading" className="member-hero-title">
-                      안녕,<br /><span className="font-display">{selectedMember.name}</span><span className="member-hero-dot">.</span>
+                    <h2 id="member-heading" className="hero-title">
+                      안녕,<br /><span className="font-display">{selectedMember.name}</span><span className="hero-dot">.</span>
                     </h2>
-                    <p className="member-hero-line">
-                      오늘 <b>{routine.trim() || selectedMember.mainWorkout}</b> 하고<br />도장 하나 찍어 볼까요?
+                    <p className="hero-line">
+                      오늘 <b>{routine}</b> 하고<br />도장 하나 찍어 볼까요?
                     </p>
                   </>
                 )}
               </div>
-              <div className="week-strip" aria-label={`이번 주 ${weeklyStampCount}회 인증`}>
-                <p className="week-strip-head" aria-hidden="true">
+              <div className="hero-panel" aria-label={`이번 주 ${weeklyStampCount}회 인증`}>
+                <p className="hero-panel-head" aria-hidden="true">
                   <span>This week</span>
                   <span>{weeklyStampCount} / 7</span>
                 </p>
@@ -677,7 +675,7 @@ export function SweatStampApp() {
                 <div className="complete-summary">
                   <div className="min-w-0">
                     <p className="complete-routine">{completedCertification.routine}</p>
-                    <p className="complete-caption">{formatStampTime(completedCertification.completedAt)}에 찍은 도장</p>
+                    <p className="complete-caption">{formatStampTime(new Date(completedCertification.completedAt))}에 찍은 도장</p>
                   </div>
                   <button type="button" className="complete-retry" onClick={resetCertification}>
                     <RotateCcwIcon aria-hidden="true" />
@@ -698,10 +696,7 @@ export function SweatStampApp() {
                         type="button"
                         className="workout-row"
                         aria-pressed={isPicked}
-                        onClick={() => setRoutines((currentRoutines) => ({
-                          ...currentRoutines,
-                          [selectedMemberId]: workout,
-                        }))}
+                        onClick={() => updateRoutine(workout)}
                       >
                         <span className="workout-row-label">
                           <small aria-hidden="true">{index === 0 ? "01 MAIN" : "02 SUB"}</small>
@@ -719,10 +714,7 @@ export function SweatStampApp() {
                       value={isPresetRoutine ? "" : routine}
                       placeholder="직접 입력"
                       aria-label="오늘의 운동"
-                      onChange={(event) => setRoutines((currentRoutines) => ({
-                        ...currentRoutines,
-                        [selectedMemberId]: event.target.value,
-                      }))}
+                      onChange={(event) => updateRoutine(event.target.value)}
                     />
                   </label>
                 </div>

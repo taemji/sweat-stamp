@@ -1,6 +1,6 @@
 # Character Refresh
 
-Replace the CSS shape characters with the illustrated animal characters, retheme each member to match their character, and let members certify without uploading a photo by stamping their main workout illustration.
+Replace the CSS shape characters with the illustrated animal characters, retheme each member to match their character, greet each member with their workout and weekly progress, and let members certify without uploading a photo by stamping their main workout illustration.
 
 ## Members
 
@@ -11,40 +11,49 @@ Replace the CSS shape characters with the illustrated animal characters, retheme
 | SOOK | Leopard | Pilates | Stretching | Sage green |
 | YOOM | Fawn | Diet Dance | Stretching | Lavender |
 
-Source images live outside the repo in `sweat-stamp-img/`. `taem_id2.png` and `taem_ballet2.png` are not used.
+The shared calendar uses a cream team theme and the four-character lineup illustration. Source images live outside the repo in `sweat-stamp-img/`. `taem_id2.png` and `taem_ballet2.png` are not used.
 
 ## Scenarios
 
-### S1. Member screen shows the illustrated character
-- Opening a member screen shows that member's ID portrait as the main character image, labelled `<NAME> 캐릭터`.
-- Member tabs and the monthly summary rows show the member's face as the avatar.
-- Every member screen uses colors derived from the character illustration.
+### S1. Header and navigation
+- The header shows `Sweat Stamp`. A storage notice appears only when shared storage failed (`공동 저장에 연결하지 못해 이 기기에만 저장돼요`) or is not configured (`이 기기에 저장`).
+- The navigation shows each member's face. The selected member also shows their name, and members who certified today show a check labelled `인증 완료`.
+- The calendar button opens the shared calendar.
 
-### S2. Main and sub workout are preset
-- With no saved routine, `오늘의 운동` is prefilled with the member's main workout in English.
-- Two quick-select chips show the main workout and `Stretching`. Tapping a chip sets `오늘의 운동` to that value and marks it as selected.
-- A routine the member typed earlier still wins over the preset.
+### S2. Member greeting
+- Before certifying, the hero shows today's date (`SAT · NOV 14`), `안녕, <NAME>.`, and `오늘 <workout> 하고 도장 하나 찍어 볼까요?`, where `<workout>` is the selected workout.
+- After certifying, the hero shows `오늘도 해냈어요.` and `<NAME>의 이번 주 <ordinal> 도장이에요.`, where the ordinal is this week's count (`첫 번째`, `두 번째`, …).
+- A Monday-to-Sunday strip shows this week's certified days, labelled `이번 주 <n>회 인증`.
 
-### S3. Certify without a photo
-- `오늘 인증 남기기` is enabled once `오늘의 운동` is not empty and `운동 완료` is checked. A photo is optional.
-- With no photo selected, the photo area shows the member's main workout illustration and explains that the stamp will be placed on it.
-- Certifying without a photo saves the main workout illustration with the `SWEAT STAMP`, member name, and date-time stamp as that day's certification photo.
-- After reload, the completed screen shows the stamped illustration as `<NAME>의 오늘 운동 사진`.
-- Choosing a camera or album photo still stamps and saves that photo instead.
+### S3. Choosing the workout
+- The main workout is selected by default. Rows `01 MAIN <main>`, `02 SUB Stretching`, and a `03` field labelled `오늘의 운동` (placeholder `직접 입력`) choose the workout.
+- A typed workout is kept for the day it was entered. On a later day, or when the field is cleared, the main workout is selected again. Routines saved without a date are ignored.
 
-### S4. App icon and share image
+### S4. Certifying
+- `오늘 인증 남기기` is enabled once `운동 완료` is checked and storage is ready. While it is disabled, a hint above it says why (`공동 저장에 연결하는 중이에요.` or `운동 완료를 체크하면 도장을 찍을 수 있어요.`).
+- With no photo selected, the photo area shows the main workout illustration with a preview of the stamp, and certifying saves that illustration with the `SWEAT STAMP`, member name, and date-time stamp.
+- Choosing a camera or album photo stamps and saves that photo instead.
+- After certifying, the sheet shows the stamped photo (`<NAME>의 오늘 운동 사진`), the workout, `<time>에 찍은 도장`, and a `다시 인증` button.
+
+### S5. Shared calendar
+- The hero says how many members certified today: `오늘 첫 도장은 누가 찍을까요?`, `<total>명 중 <n>명이 도장 찍었어요.`, or `오늘은 모두 해냈어요.`
+- Below the greeting, the four characters from `team_lineup.png` stand in a row. Characters who certified today are shown in full color, the others are faded, and tapping a character opens that member's screen.
+- The month grid starts on Monday, shows only the weeks it needs, and marks each day with a dot per certified member.
+
+### S6. App icon and share image
 - The app icon, Apple touch icon, and PWA manifest icons use the four-character face image.
 - Link previews use the four-character workout image.
 
 ## Success Criteria
 
 1. Member profiles define `mainWorkout` = Ballet, Pilates, Pilates, Diet Dance and `subWorkout` = Stretching for TAEM, SAM, SOOK, YOOM.
-2. Each member has four distinct accent colors, and white text on each accent meets a contrast ratio of 4.5:1 or higher.
+2. Each member has a distinct accent, and white text on each accent has a contrast ratio of 4.5:1 or higher. The team accent has 4.5:1 or higher on the team background.
 3. Each member has a distinct portrait, avatar, and workout image path, and each file exists under `public/`.
-4. E2E: a new member screen shows `<NAME> 캐릭터` as an image and `오늘의 운동` prefilled with the main workout.
-5. E2E: tapping the `Stretching` chip changes `오늘의 운동` to `Stretching`.
-6. E2E: with the routine filled and `운동 완료` checked, and no photo selected, certification succeeds and survives a reload with a stamped JPEG photo.
-7. The manifest lists PNG icons that exist under `public/`, including a maskable icon.
+4. E2E: a member screen shows `<NAME> 캐릭터` as an image and the main workout row selected.
+5. E2E: tapping `Stretching` selects it; a custom workout survives a reload on the same day; a workout from an earlier day and a cleared field fall back to the main workout.
+6. E2E: with `운동 완료` checked and no photo selected, certification succeeds, the greeting changes to `오늘도 해냈어요.`, and a stamped JPEG photo survives a reload.
+7. E2E: the calendar greeting and the character row reflect today's certifications.
+8. The manifest lists PNG icons that exist under `public/`, including a maskable icon.
 
 ## Out of Scope
 

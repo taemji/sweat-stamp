@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  formatKoreanOrdinal,
+  WEEKDAY_LABELS,
   getLocalDateKey,
   getMonthCalendarDays,
   getWeekDateKeys,
@@ -51,9 +51,11 @@ describe("certification calendar", () => {
     ]);
   });
 
-  it("formats weekly stamp counts as Korean ordinals", () => {
-    expect(formatKoreanOrdinal(1)).toBe("첫 번째");
-    expect(formatKoreanOrdinal(4)).toBe("네 번째");
-    expect(formatKoreanOrdinal(7)).toBe("일곱 번째");
+  it("labels weekdays in the same Monday-first order as the grids", () => {
+    const week = getWeekDateKeys(new Date(2026, 10, 14));
+
+    expect(WEEKDAY_LABELS).toEqual(["월", "화", "수", "목", "금", "토", "일"]);
+    expect(new Date(`${week[0]}T00:00:00`).getDay()).toBe(1);
+    expect(new Date(`${week[6]}T00:00:00`).getDay()).toBe(0);
   });
 });

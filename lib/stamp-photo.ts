@@ -22,6 +22,10 @@ export function formatStampDateTime(stampedAt: Date) {
   return `${date} ${time}`;
 }
 
+export function formatStampTime(stampedAt: Date) {
+  return new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit" }).format(stampedAt);
+}
+
 function getOutputDimensions(width: number, height: number) {
   const scale = Math.min(1, maxPhotoDimension / Math.max(width, height));
 

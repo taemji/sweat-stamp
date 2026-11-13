@@ -21,8 +21,8 @@ This is a mobile-first Sweat Stamp photo certification app built with Next.js 16
 ## Product And UX Conventions
 
 - User-facing UI copy is Korean and should stay natural Korean unless a task explicitly changes language.
-- The app is designed for a narrow mobile viewport (`max-w-[430px]`) with a native-app feel. Verify mobile layout carefully when touching UI.
-- Follow the existing visual system in `app/globals.css`: member theme tokens, a Korean system font stack, compact panels, and person-specific accents.
+- The app is designed for a narrow mobile viewport (`.stamp-frame`, max 480px) with a native-app feel. Verify mobile layout carefully when touching UI.
+- Follow the existing visual system in `app/globals.css`: member theme tokens (`--member-accent`, `--member-tint`, `--member-ink`), Pretendard for Korean, Bricolage Grotesque (`font-display`) for English, and person-specific accents.
 - Prefer Lucide icons for actions and existing shadcn/ui components for controls.
 - Preserve accessibility affordances already present: semantic headings, labels, `aria-live` where useful, and role/name-friendly controls for Playwright tests.
 - Camera capture, Supabase, and IndexedDB fallback are runtime capabilities. Keep album selection, remote errors, and local fallback paths working.
@@ -33,7 +33,7 @@ This is a mobile-first Sweat Stamp photo certification app built with Next.js 16
 - `app/layout.tsx` owns metadata, Korean HTML language, and the theme provider.
 - `components/sweat-stamp-app.tsx` owns member selection, routines, photo selection, completion, and shared/local persistence coordination.
 - `components/ui/*` contains shadcn-generated primitives. Do not edit these directly unless the task is explicitly about the primitive itself; prefer variants, semantic tokens, CSS variables, or wrapper composition.
-- `lib/member-profiles.ts` is the single source for member IDs, display names, colors, character variants, and screen copy.
+- `lib/member-profiles.ts` is the single source for member IDs, display names, workouts, colors, character image paths, and the team theme used by the shared calendar. Korean count and ordinal wording lives in `lib/korean-format.ts`; weekday labels live with the Monday-first date helpers in `lib/certification-calendar.ts`.
 - `lib/shared-certifications.ts` owns Supabase table and Storage operations.
 - `lib/certification-photo-store.ts` owns IndexedDB photo persistence. Keep browser failure handling and database upgrades backward compatible.
 - `supabase/migrations/*` owns the Postgres schema, Storage bucket, grants, and RLS policies.

@@ -115,6 +115,11 @@ test("a custom workout lasts for today only", async ({ page }) => {
   await page.getByRole("button", { name: "TAEM 선택" }).click();
   await expect(page.getByLabel("오늘의 운동")).toHaveValue("숨쉬기");
   await expect(page.getByRole("button", { name: "Ballet", exact: true })).toHaveAttribute("aria-pressed", "false");
+
+  await page.getByLabel("오늘의 운동").fill("");
+  await expect(page.getByRole("button", { name: "Ballet", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Ballet 하고")).toBeVisible();
+  await expect(page.getByText("운동 완료를 체크하면 도장을 찍을 수 있어요.")).toBeVisible();
 });
 
 test("legacy member ids migrate to sam and yoom", async ({ page }) => {

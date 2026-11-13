@@ -20,8 +20,8 @@ describe("daily routines", () => {
     expect(readDailyRoutines(null, "2026-11-14")).toEqual({});
   });
 
-  it("ignores routine values that are not text", () => {
-    const stored = { dateKey: "2026-11-14", routines: { taem: "Barre", sam: 3 } };
+  it("ignores routine values that are not text or are blank", () => {
+    const stored = { dateKey: "2026-11-14", routines: { taem: "Barre", sam: 3, sook: "", yoom: "  " } };
 
     expect(readDailyRoutines(stored, "2026-11-14")).toEqual({ taem: "Barre" });
   });

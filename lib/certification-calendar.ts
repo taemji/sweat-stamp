@@ -3,6 +3,8 @@ export interface CalendarDay {
   dayNumber: number | null;
 }
 
+export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"] as const;
+
 export function getLocalDateKey(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -45,10 +47,4 @@ export function getWeekDateKeys(date = new Date()) {
   return Array.from({ length: 7 }, (_, index) => (
     getLocalDateKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() - daysSinceMonday + index))
   ));
-}
-
-const koreanOrdinals = ["첫", "두", "세", "네", "다섯", "여섯", "일곱"];
-
-export function formatKoreanOrdinal(count: number) {
-  return `${koreanOrdinals[count - 1] ?? count} 번째`;
 }

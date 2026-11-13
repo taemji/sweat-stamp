@@ -18,5 +18,7 @@ export function readDailyRoutines(stored: unknown, todayKey: string): Record<str
     return {};
   }
 
-  return Object.fromEntries(Object.entries(routines).filter(([, routine]) => typeof routine === "string"));
+  return Object.fromEntries(
+    Object.entries(routines).filter(([, routine]) => typeof routine === "string" && routine.trim() !== ""),
+  );
 }

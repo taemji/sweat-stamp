@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { MEMBER_PROFILES, getMemberProfile, isMemberId } from "./member-profiles";
+import { MEMBER_PROFILES, TEAM_THEME, getMemberProfile, isMemberId } from "./member-profiles";
 
 function getRelativeLuminance(hexColor: string) {
   const [red, green, blue] = [1, 3, 5]
@@ -28,9 +28,10 @@ describe("member profiles", () => {
   });
 
   it("gives every member an independent visual identity", () => {
-    for (const field of ["accent", "character", "portrait", "avatar", "workoutImage"] as const) {
+    for (const field of ["accent", "accentSoft", "portrait", "avatar", "workoutImage"] as const) {
       expect(new Set(MEMBER_PROFILES.map((member) => member[field]))).toHaveLength(4);
     }
+    expect(new Set(MEMBER_PROFILES.map((member) => member.lineup.src))).toHaveLength(4);
   });
 
   it("keeps white text readable on every member accent", () => {
@@ -39,9 +40,15 @@ describe("member profiles", () => {
     }
   });
 
+  it("keeps the team theme accent readable on its own background", () => {
+    const contrast = (getRelativeLuminance(TEAM_THEME.accentSoft) + 0.05) / (getRelativeLuminance(TEAM_THEME.accent) + 0.05);
+
+    expect(contrast).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("points every character image at a file in public", () => {
     for (const member of MEMBER_PROFILES) {
-      for (const imagePath of [member.portrait, member.avatar, member.workoutImage]) {
+      for (const imagePath of [member.portrait, member.avatar, member.workoutImage, member.lineup.src]) {
         expect(existsSync(path.join(process.cwd(), "public", imagePath)), imagePath).toBe(true);
       }
     }
