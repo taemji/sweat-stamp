@@ -1,15 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { getLocalDateKey, getMonthCalendarDays, shiftMonth } from "./certification-calendar";
+import {
+  formatKoreanOrdinal,
+  getLocalDateKey,
+  getMonthCalendarDays,
+  getWeekDateKeys,
+  shiftMonth,
+} from "./certification-calendar";
 
 describe("certification calendar", () => {
-  it("builds a stable six-week month grid", () => {
-    const days = getMonthCalendarDays(new Date(2026, 10, 1));
+  it("builds a Monday-first month grid with only the weeks it needs", () => {
+    const november = getMonthCalendarDays(new Date(2026, 10, 1));
 
-    expect(days).toHaveLength(42);
-    expect(days[0]).toEqual({ dateKey: "2026-11-01", dayNumber: 1 });
-    expect(days[29]).toEqual({ dateKey: "2026-11-30", dayNumber: 30 });
-    expect(days[30]).toEqual({ dateKey: null, dayNumber: null });
+    expect(november).toHaveLength(42);
+    expect(november[5]).toEqual({ dateKey: null, dayNumber: null });
+    expect(november[6]).toEqual({ dateKey: "2026-11-01", dayNumber: 1 });
+    expect(november[35]).toEqual({ dateKey: "2026-11-30", dayNumber: 30 });
+
+    const february = getMonthCalendarDays(new Date(2027, 1, 1));
+
+    expect(february).toHaveLength(28);
+    expect(february[0]).toEqual({ dateKey: "2027-02-01", dayNumber: 1 });
+    expect(february[27]).toEqual({ dateKey: "2027-02-28", dayNumber: 28 });
+
+    expect(getMonthCalendarDays(new Date(2026, 9, 1))).toHaveLength(35);
   });
 
   it("keeps leap days and local date formatting", () => {
@@ -25,5 +39,21 @@ describe("certification calendar", () => {
 
     expect([previousMonth.getFullYear(), previousMonth.getMonth()]).toEqual([2025, 11]);
     expect([nextMonth.getFullYear(), nextMonth.getMonth()]).toEqual([2027, 0]);
+  });
+
+  it("lists the Monday-to-Sunday week around a date, across month ends", () => {
+    expect(getWeekDateKeys(new Date(2026, 10, 14))).toEqual([
+      "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15",
+    ]);
+    expect(getWeekDateKeys(new Date(2026, 10, 29))[0]).toBe("2026-11-23");
+    expect(getWeekDateKeys(new Date(2026, 11, 2))).toEqual([
+      "2026-11-30", "2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04", "2026-12-05", "2026-12-06",
+    ]);
+  });
+
+  it("formats weekly stamp counts as Korean ordinals", () => {
+    expect(formatKoreanOrdinal(1)).toBe("첫 번째");
+    expect(formatKoreanOrdinal(4)).toBe("네 번째");
+    expect(formatKoreanOrdinal(7)).toBe("일곱 번째");
   });
 });

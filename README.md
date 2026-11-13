@@ -4,9 +4,9 @@
 
 ## 주요 기능
 
-- 네 사람에게 각각 다른 색상과 캐릭터가 적용되는 개인 인증 화면
-- 사람마다 독립적으로 저장되는 오늘의 운동
-- 운동 완료 체크와 카메라·앨범 사진 첨부
+- 네 사람에게 각각 다른 색상과 동물 캐릭터(TAEM 토끼, SAM 코알라, SOOK 표범, YOOM 아기 사슴)가 적용되는 개인 인증 화면
+- 멤버별 메인 운동(Ballet, Pilates, Pilates, Diet Dance)이 미리 채워지고, 서브 운동(Stretching)은 한 번에 선택
+- 운동 완료 체크와 카메라·앨범 사진 첨부. 사진이 없으면 캐릭터의 메인 운동 이미지에 스탬프를 찍어 인증
 - 선택한 사진에 `SWEAT STAMP`, 멤버명, 앱에서 선택한 날짜·시간 합성
 - 브라우저를 닫아도 유지되는 오늘 인증 상태와 사진
 - 네 사람의 오늘 인증 현황을 한 화면에서 확인
@@ -93,6 +93,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
 | `bun run test` | Vitest 실행 |
 | `bun run test:watch` | Vitest watch 모드 실행 |
 | `bun run test:e2e` | Playwright E2E 테스트 실행 |
+| `node scripts/build-character-assets.mjs` | `../sweat-stamp-img` 원본으로 캐릭터·아이콘·공유 이미지 재생성 (`CHARACTER_IMAGE_DIR`로 경로 변경) |
 
 새 환경에서 E2E 테스트를 처음 실행하기 전에는 Chromium을 설치합니다.
 
@@ -104,7 +105,9 @@ bunx playwright install chromium
 
 - [app/page.tsx](./app/page.tsx): 앱 진입점
 - [components/sweat-stamp-app.tsx](./components/sweat-stamp-app.tsx): 4인 사진 인증 플로우
-- [lib/member-profiles.ts](./lib/member-profiles.ts): 사람별 이름, 색상, 캐릭터 설정
+- [lib/member-profiles.ts](./lib/member-profiles.ts): 사람별 이름, 색상, 캐릭터 이미지, 메인·서브 운동 설정
+- [lib/default-workout-photo.ts](./lib/default-workout-photo.ts): 사진 없이 인증할 때 쓰는 메인 운동 이미지 로드
+- [public/characters](./public/characters): 캐릭터 portrait, avatar, workout 이미지
 - [lib/certification-photo-store.ts](./lib/certification-photo-store.ts): IndexedDB 사진 저장
 - [lib/shared-certifications.ts](./lib/shared-certifications.ts): Supabase 공동 인증 저장
 - [supabase/migrations](./supabase/migrations): 테이블, Storage, RLS 정책

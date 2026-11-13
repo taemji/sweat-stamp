@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    // Character images are pre-sized WebP files from scripts/build-character-assets.mjs.
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;

@@ -2,6 +2,7 @@ const maxPhotoDimension = 2048;
 
 interface StampPhotoOptions {
   accent: string;
+  fontFamily?: string;
   memberName: string;
   stampedAt: Date;
 }
@@ -39,6 +40,9 @@ export async function createStampedPhoto(file: File, options: StampPhotoOptions)
     throw new Error("이 사진 형식은 사용할 수 없어요. JPG, PNG 또는 WebP 사진을 선택해 주세요.");
   }
 
+  const fontFamily = options.fontFamily || "sans-serif";
+  await document.fonts?.load(`700 32px ${fontFamily}`).catch(() => undefined);
+
   const dimensions = getOutputDimensions(image.width, image.height);
   const canvas = document.createElement("canvas");
   canvas.width = dimensions.width;
@@ -72,9 +76,9 @@ export async function createStampedPhoto(file: File, options: StampPhotoOptions)
 
   context.textBaseline = "bottom";
   context.fillStyle = "#ffffff";
-  context.font = `900 ${titleSize}px sans-serif`;
+  context.font = `700 ${titleSize}px ${fontFamily}`;
   context.fillText("SWEAT STAMP", padding + titleSize * 0.48, dimensions.height - padding - detailSize * 1.42);
-  context.font = `700 ${detailSize}px sans-serif`;
+  context.font = `600 ${detailSize}px ${fontFamily}`;
   context.fillStyle = "rgba(255, 255, 255, 0.9)";
   context.fillText(`${options.memberName} · ${formatStampDateTime(options.stampedAt)}`, padding, dimensions.height - padding);
 
