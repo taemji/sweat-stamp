@@ -5,6 +5,7 @@ import { MEMBER_PROFILES, getMemberProfile, isMemberId } from "./member-profiles
 describe("member profiles", () => {
   it("defines the four certification members in display order", () => {
     expect(MEMBER_PROFILES.map((member) => member.id)).toEqual(["taem", "saem", "yum", "ssuk"]);
+    expect(MEMBER_PROFILES.map((member) => member.name)).toEqual(["TAEM", "SAEM", "YUM", "SSUK"]);
   });
 
   it("gives every member an independent visual identity", () => {
@@ -15,6 +16,6 @@ describe("member profiles", () => {
   it("validates and resolves only known member ids", () => {
     expect(isMemberId("taem")).toBe(true);
     expect(isMemberId("unknown")).toBe(false);
-    expect(getMemberProfile("ssuk").name).toBe("ssuk");
+    expect(getMemberProfile("ssuk").name).toBe("SSUK");
   });
 });

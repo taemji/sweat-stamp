@@ -1,8 +1,7 @@
 export const MEMBER_PROFILES = [
   {
     id: "taem",
-    name: "taem",
-    initial: "T",
+    name: "TAEM",
     character: "block",
     accent: "#e85d3f",
     accentSoft: "#ffe5dc",
@@ -12,8 +11,7 @@ export const MEMBER_PROFILES = [
   },
   {
     id: "saem",
-    name: "saem",
-    initial: "S",
+    name: "SAEM",
     character: "drop",
     accent: "#247da0",
     accentSoft: "#dff2f8",
@@ -23,8 +21,7 @@ export const MEMBER_PROFILES = [
   },
   {
     id: "yum",
-    name: "yum",
-    initial: "Y",
+    name: "YUM",
     character: "round",
     accent: "#d99a00",
     accentSoft: "#fff0b8",
@@ -34,8 +31,7 @@ export const MEMBER_PROFILES = [
   },
   {
     id: "ssuk",
-    name: "ssuk",
-    initial: "S",
+    name: "SSUK",
     character: "sprout",
     accent: "#4d8048",
     accentSoft: "#e1efda",

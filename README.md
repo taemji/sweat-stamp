@@ -1,4 +1,4 @@
-# 땀도장
+# Sweat Stamp
 
 `taem`, `saem`, `yum`, `ssuk` 네 사람이 매일 자신의 운동을 체크하고 사진으로 인증하는 모바일 우선 PWA입니다.
 

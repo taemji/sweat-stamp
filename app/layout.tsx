@@ -3,7 +3,7 @@ import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "땀도장",
+  title: "Sweat Stamp",
   description: "네 사람의 매일 운동을 사진으로 남기는 인증 앱",
 };
 
