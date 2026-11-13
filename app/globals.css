@@ -368,7 +368,8 @@
     transition: opacity 200ms ease;
   }
 
-  .team-lineup-member[data-done="true"] img {
+  .team-lineup-member[data-done="true"] img,
+  .team-lineup[data-loading="true"] img {
     opacity: 1;
   }
 
@@ -473,24 +474,6 @@
   }
 
   .workout-row-label {
-    display: flex;
-    min-width: 0;
-    align-items: baseline;
-    gap: 0.6rem;
-  }
-
-  .workout-row small {
-    flex: 0 0 auto;
-    font-family: var(--font-display);
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
-  .workout-row[aria-pressed="true"] small {
-    color: var(--member-accent);
-  }
-
-  .workout-row strong {
     overflow: hidden;
     font-family: var(--font-display);
     font-size: 1.25rem;
@@ -656,10 +639,10 @@
     stroke-width: 2;
   }
 
-  .certify-hint {
-    margin-bottom: -0.35rem;
+  .sheet-loading {
+    padding: 2rem 0;
     color: #7a6e70;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     text-align: center;
   }
 

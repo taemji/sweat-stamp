@@ -59,7 +59,6 @@ import { isSupabaseConfigured } from "@/lib/supabase-client";
 interface Certification {
   completedAt: string;
   memberId: MemberId;
-  photoName: string;
   photoPath?: string;
   routine: string;
 }
@@ -98,7 +97,6 @@ function mapSharedCertificationRecords(sharedCertifications: SharedCertification
     {
       completedAt: certification.completedAt,
       memberId: certification.memberId,
-      photoName: certification.photoPath.split("/").at(-1) ?? "workout-stamped.jpg",
       photoPath: certification.photoPath,
       routine: certification.routine,
     } satisfies Certification,
@@ -153,7 +151,7 @@ function CalendarOverview({
             const accessibleLabel = `${day.dayNumber}일, ${completedNames ? `${completedNames} 인증 완료` : "인증 없음"}`;
 
             return (
-              <div key={day.dateKey} className="calendar-day" data-today={day.dateKey === todayKey} aria-label={accessibleLabel}>
+              <div key={day.dateKey} className="calendar-day" data-today={day.dateKey === todayKey} role="group" aria-label={accessibleLabel}>
                 <span className="calendar-date">{day.dayNumber}</span>
                 <span className="calendar-stamps" aria-hidden="true">
                   {completedMembers.map((member) => (
@@ -174,9 +172,10 @@ export function SweatStampApp() {
   const [activeView, setActiveView] = useState<AppView>("calendar");
   const [selectedMemberId, setSelectedMemberId] = useState<MemberId>("taem");
   const [visibleMonth, setVisibleMonth] = useState(() => {
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1);
+    const [year, month] = getLocalDateKey(new Date(), TEAM_TIME_ZONE).split("-").map(Number);
+    return new Date(year, month - 1, 1);
   });
+  const [now, setNow] = useState(() => new Date());
   const [routines, setRoutines] = useState<RoutineMap>({});
   const [certifications, setCertifications] = useState<CertificationMap>({});
   const [photoPreview, setPhotoPreview] = useState<{ file: File; stampedAt: Date; url: string } | null>(null);
@@ -189,12 +188,12 @@ export function SweatStampApp() {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const selectedMember = getMemberProfile(selectedMemberId);
-  const now = new Date();
   const teamTodayKey = getLocalDateKey(now, TEAM_TIME_ZONE);
   const todayKey = getLocalDateKey(now, selectedMember.timeZone);
   const certificationKey = getCertificationKey(selectedMemberId, todayKey);
   const completedCertification = certifications[certificationKey];
-  const routine = routines[selectedMemberId] ?? selectedMember.mainWorkout;
+  const routineInput = routines[selectedMemberId] ?? selectedMember.mainWorkout;
+  const routine = routineInput.trim();
   const workoutPresets: string[] = [selectedMember.mainWorkout, selectedMember.subWorkout];
   const isPresetRoutine = workoutPresets.includes(routine);
   const weekDays = getWeekDateKeys(todayKey).map((dateKey, index) => ({
@@ -219,7 +218,7 @@ export function SweatStampApp() {
   const remainingMemberCount = memberCount - todayDoneMembers.length;
   const isStorageReady = hasHydrated && syncStatus !== "connecting";
   const syncNotice = syncStatus === "error" ? "공동 저장에 연결하지 못해 이 기기에만 저장돼요" : "";
-  const certifyHint = isStorageReady ? "" : "공동 저장에 연결하는 중이에요.";
+  const loadingMessage = "오늘 기록을 불러오는 중이에요.";
   const canCertify = isStorageReady && !isProcessingPhoto;
   const isCalendarView = activeView === "calendar";
   const themeStyle = {
@@ -276,6 +275,11 @@ export function SweatStampApp() {
       window.cancelAnimationFrame(frameId);
     };
   }, [usesSharedStorage]);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timerId);
+  }, []);
 
   useEffect(() => {
     if (!hasHydrated) {
@@ -429,8 +433,7 @@ export function SweatStampApp() {
       const nextCertification: Certification = {
         completedAt: certificationPhoto.stampedAt.toISOString(),
         memberId: selectedMemberId,
-        photoName: certificationPhoto.file.name,
-        routine: routine.trim(),
+        routine,
       };
 
       if (syncStatus === "shared") {
@@ -458,8 +461,13 @@ export function SweatStampApp() {
   async function resetCertification() {
     setSaveError("");
 
+    if (completedCertification?.photoPath && syncStatus !== "shared") {
+      setSaveError("공동 저장에 연결된 뒤 다시 시도해 주세요.");
+      return;
+    }
+
     try {
-      if (syncStatus === "shared" && completedCertification?.photoPath) {
+      if (completedCertification?.photoPath) {
         await deleteSharedCertification({
           completedAt: completedCertification.completedAt,
           memberId: completedCertification.memberId,
@@ -537,22 +545,26 @@ export function SweatStampApp() {
               <div className="hero-copy">
                 <p className="hero-date">{teamDayLabel}</p>
                 <h2 id="team-heading" className="hero-title">
-                  {todayDoneMembers.length === 0
+                  {!isStorageReady
+                    ? <>오늘의<br />도장</>
+                    : todayDoneMembers.length === 0
                     ? <>오늘 첫 도장은<br />누가 찍을까요</>
                     : remainingMemberCount === 0
                       ? <>오늘은 모두<br />해냈어요</>
                       : <>{memberCount}명 중 {todayDoneMembers.length}명이<br />도장 찍었어요</>}
-                  <span className="hero-dot">{todayDoneMembers.length === 0 ? "?" : "."}</span>
+                  <span className="hero-dot">{isStorageReady && todayDoneMembers.length === 0 ? "?" : "."}</span>
                 </h2>
                 <p className="hero-line">
-                  {todayDoneMembers.length === 0
+                  {!isStorageReady
+                    ? loadingMessage
+                    : todayDoneMembers.length === 0
                     ? `${formatKoreanHeadcount(memberCount)} 모두 아직이에요.`
                     : remainingMemberCount === 0
                       ? `${formatKoreanHeadcount(memberCount)} 모두 도장을 찍었어요.`
                       : `남은 ${formatKoreanHeadcount(remainingMemberCount)}도 같이 가 볼까요?`}
                 </p>
               </div>
-              <div className="team-lineup" role="group" aria-label={`오늘 ${todayDoneMembers.length}명 인증`}>
+              <div className="team-lineup" role="group" aria-label={isStorageReady ? `오늘 ${todayDoneMembers.length}명 인증` : "네 멤버"} data-loading={!isStorageReady}>
                 {MEMBER_PROFILES.map((member) => {
                   const isDone = todayDoneIds.has(member.id);
 
@@ -574,7 +586,7 @@ export function SweatStampApp() {
                         priority
                       />
                       <span className="team-lineup-count" style={{ "--chip-accent": member.accent } as CSSProperties} aria-hidden="true">
-                        {monthlyCounts.get(member.id)}회
+                        {isStorageReady ? `${monthlyCounts.get(member.id)}회` : "\u00a0"}
                       </span>
                     </button>
                   );
@@ -603,7 +615,14 @@ export function SweatStampApp() {
               />
               <div className="hero-copy">
                 <p className="hero-date">{memberDayLabel}{completedCertification ? " · DONE" : ""}</p>
-                {completedCertification ? (
+                {!isStorageReady ? (
+                  <>
+                    <h2 id="member-heading" className="hero-title">
+                      안녕,<br /><span className="font-display">{selectedMember.name}</span><span className="hero-dot">.</span>
+                    </h2>
+                    <p className="hero-line">{loadingMessage}</p>
+                  </>
+                ) : completedCertification ? (
                   <>
                     <h2 id="member-heading" className="hero-title">오늘도<br />해냈어요<span className="hero-dot">.</span></h2>
                     <p className="hero-line">
@@ -621,23 +640,29 @@ export function SweatStampApp() {
                   </>
                 )}
               </div>
-              <div className="hero-panel" aria-label={`이번 주 ${weeklyStampCount}회 인증`}>
-                <p className="hero-panel-head" aria-hidden="true">
-                  <span>This week</span>
-                  <span>{weeklyStampCount} / 7</span>
-                </p>
-                <ol className="week-strip-days" aria-hidden="true">
-                  {weekDays.map((day) => (
-                    <li key={day.dateKey} data-done={day.isDone} data-today={day.isToday}>
-                      <i />
-                      <small>{day.label}</small>
-                    </li>
-                  ))}
-                </ol>
-              </div>
+              {isStorageReady && (
+                <div className="hero-panel" role="group" aria-label={`이번 주 ${weeklyStampCount}회 인증`}>
+                  <p className="hero-panel-head" aria-hidden="true">
+                    <span>This week</span>
+                    <span>{weeklyStampCount} / 7</span>
+                  </p>
+                  <ol className="week-strip-days" aria-hidden="true">
+                    {weekDays.map((day) => (
+                      <li key={day.dateKey} data-done={day.isDone} data-today={day.isToday}>
+                        <i />
+                        <small>{day.label}</small>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </section>
 
-            {completedCertification ? (
+            {!isStorageReady ? (
+              <section className="stamp-sheet" aria-busy="true">
+                <p className="sheet-loading">{loadingMessage}</p>
+              </section>
+            ) : completedCertification ? (
               <section className="stamp-sheet certification-complete" aria-live="polite">
                 {storedPhoto?.key === certificationKey && (
                   <div
@@ -662,7 +687,7 @@ export function SweatStampApp() {
             ) : (
               <section className="stamp-sheet" aria-label="오늘 인증">
                 <div className="workout-list" role="group" aria-label="운동 빠르게 선택">
-                  {workoutPresets.map((workout, index) => {
+                  {workoutPresets.map((workout) => {
                     const isPicked = routine === workout;
 
                     return (
@@ -673,20 +698,16 @@ export function SweatStampApp() {
                         aria-pressed={isPicked}
                         onClick={() => updateRoutine(workout)}
                       >
-                        <span className="workout-row-label">
-                          <small aria-hidden="true">{index === 0 ? "01 MAIN" : "02 SUB"}</small>
-                          <strong>{workout}</strong>
-                        </span>
+                        <strong className="workout-row-label">{workout}</strong>
                         <span className="workout-row-mark" aria-hidden="true">{isPicked && <CheckIcon />}</span>
                       </button>
                     );
                   })}
                   <label className="workout-row workout-row-custom" htmlFor="daily-routine">
-                    <small aria-hidden="true">03</small>
                     <input
                       id="daily-routine"
                       type="text"
-                      value={isPresetRoutine ? "" : routine}
+                      value={isPresetRoutine ? "" : routineInput}
                       placeholder="직접 입력"
                       aria-label="오늘의 운동"
                       onChange={(event) => updateRoutine(event.target.value)}
@@ -736,8 +757,6 @@ export function SweatStampApp() {
                 </div>
 
                 {saveError && <p className="text-sm font-medium text-destructive" role="alert">{saveError}</p>}
-
-                {certifyHint && <p className="certify-hint">{certifyHint}</p>}
 
                 <button type="button" className="certify-button" disabled={!canCertify || isSaving} onClick={certifyToday}>
                   <span>{isSaving ? "도장 찍는 중" : `오늘 ${routine} 완료 · 도장 찍기`}</span>

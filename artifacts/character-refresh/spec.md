@@ -44,6 +44,12 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 - The app icon, Apple touch icon, and PWA manifest icons use the four-character face image.
 - Link previews use the four-character workout image.
 
+### S7. Time zones and loading
+- Each member's day, stamp times, weekly strip, and today's status use their own time zone (SAM: Australia/Sydney; others: Asia/Seoul). Calendar dots and monthly counts file each certification under the member's own date, so a SAM stamp just after Sydney midnight on the 1st counts toward the new month even while Seoul is still on the previous day.
+- The shared calendar opens on the current month in Seoul and marks Seoul's today.
+- Until stored certifications have loaded, the screens show `오늘 기록을 불러오는 중이에요.` instead of counts, statuses, or the certify form.
+- `다시 인증` on a shared certification is refused with `공동 저장에 연결된 뒤 다시 시도해 주세요.` while shared storage is unavailable.
+
 ## Success Criteria
 
 1. Member profiles define `mainWorkout` = Ballet, Pilates, Pilates, Diet Dance and `subWorkout` = Stretching for TAEM, SAM, SOOK, YOOM.

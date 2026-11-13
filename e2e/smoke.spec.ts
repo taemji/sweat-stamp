@@ -122,6 +122,9 @@ test("a custom workout lasts for today only", async ({ page }) => {
   await page.getByLabel("오늘의 운동").fill("");
   await expect(page.getByRole("button", { name: "Ballet", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Ballet 하고")).toBeVisible();
+
+  await page.getByLabel("오늘의 운동").fill("Barre  ");
+  await expect(page.getByRole("button", { name: /도장 찍기$/ })).toHaveAccessibleName("오늘 Barre 완료 · 도장 찍기");
 });
 
 test("legacy member ids migrate to sam and yoom", async ({ page }) => {
@@ -148,7 +151,7 @@ test("legacy member ids migrate to sam and yoom", async ({ page }) => {
   expect(Object.keys(migratedStorage.certifications).sort()).toEqual(["2026-11-13:sam", "2026-11-13:sook", "2026-11-13:yoom"]);
 });
 
-test("photo and workout check complete today's certification", async ({ page }) => {
+test("a picked photo is stamped and certifies today", async ({ page }) => {
   await page.getByRole("button", { name: "TAEM 선택" }).click();
   const certifyButton = page.getByRole("button", { name: /도장 찍기$/ });
 
