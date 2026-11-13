@@ -1,110 +1,56 @@
 import { expect, test } from "@playwright/test";
 
-test("home page loads", async ({ page }) => {
+test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveTitle("Squat Coach");
-  await expect(page.getByRole("heading", { name: "Squat Coach" })).toBeVisible();
-  await expect(page.getByText("오늘 루틴을 설정해요")).toBeVisible();
-  await expect(page.getByLabel("세트 수")).toHaveValue("4");
-  await expect(page.getByLabel("세트당 개수")).toHaveValue("30");
-  await expect(page.getByLabel("휴식 시간(초)")).toHaveValue("60");
-  await expect(page.getByLabel("휴식 시간(초)")).toBeEnabled();
-  await expect(page.getByText("4세트 x 30개 · 휴식 60초")).toBeVisible();
-  await expect(page.getByRole("button", { name: /시작하기/ })).toBeVisible();
-  await expect(page.getByText("120")).toBeVisible();
+  await page.evaluate(async () => {
+    window.localStorage.clear();
+    await new Promise<void>((resolve) => {
+      const request = window.indexedDB.deleteDatabase("sweat-stamp");
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+      request.onblocked = () => resolve();
+    });
+  });
+  await page.reload();
 });
 
-test("page shows the cumulative chart between the calendar and start button", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 667 });
-  await page.goto("/");
+test("home shows four independent member certification screens", async ({ page }) => {
+  await expect(page).toHaveTitle("땀도장");
+  await expect(page.getByRole("heading", { name: "땀도장" })).toBeVisible();
 
-  const cumulativeChart = page.getByLabel("누적기록 차트");
-  await cumulativeChart.scrollIntoViewIfNeeded();
-
-  await expect(cumulativeChart).toBeVisible();
-  await expect(cumulativeChart.getByText("민지")).toBeVisible();
-  await expect(cumulativeChart.getByText("주영")).toBeVisible();
-  await expect(cumulativeChart.getByText("동훈")).toBeVisible();
-  await expect(page.getByRole("button", { name: /시작하기/ })).toBeVisible();
-});
-
-test("start flow shows countdown before workout", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: /시작하기/ }).click();
-  await expect(page.getByText("자세를 잡아주세요")).toBeVisible();
-  await expect(page.getByText("곧 시작합니다")).toBeVisible();
-  await expect(page.getByRole("button", { name: "바로 시작" })).toBeVisible();
-});
-
-test("configured set plan drives workout and rest screen", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("세트 수").fill("2");
-  await page.getByLabel("세트당 개수").fill("1");
-  await expect(page.getByLabel("휴식 시간(초)")).toHaveValue("60");
-  await expect(page.getByText("2세트 x 1개 · 휴식 60초")).toBeVisible();
-
-  await page.getByRole("button", { name: /시작하기/ }).click();
-  const sensorAlertConfirm = page.getByRole("button", { name: "확인" });
-
-  if (await sensorAlertConfirm.waitFor({ state: "visible", timeout: 1000 }).then(() => true).catch(() => false)) {
-    await sensorAlertConfirm.click();
+  for (const memberName of ["taem", "saem", "yum", "ssuk"]) {
+    const memberButton = page.getByRole("button", { name: `${memberName} 선택` });
+    await expect(memberButton).toBeVisible();
+    await memberButton.click();
+    await expect(page.getByRole("heading", { name: memberName })).toBeVisible();
+    await expect(page.getByLabel(`${memberName} 캐릭터`)).toBeVisible();
+    await expect(page.getByPlaceholder(`${memberName}의 운동을 입력하세요`)).toBeVisible();
   }
-
-  await page.getByRole("button", { name: "바로 시작" }).click();
-  await expect(page.getByText("1/2 세트")).toBeVisible();
-  await expect(page.getByText("1 reps")).toBeVisible();
-  await expect(page.getByText(/기준 자세 측정|선 자세에서 시작하세요|센서/)).toBeVisible();
-  await expect(page.getByText(/감도 \d+%/)).toBeVisible();
-
-  await page.getByRole("button", { name: "수동 +1" }).click();
-  await expect(page.getByText("휴식 중")).toBeVisible();
-  await expect(page.getByText("다음 2/2 세트")).toBeVisible();
-  await expect(page.getByText("1:00")).toBeVisible();
-
-  await page.getByRole("button", { name: "다음 세트" }).click();
-  await expect(page.getByText("2/2 세트")).toBeVisible();
 });
 
-test("manual set button completes all remaining reps at once", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("세트 수").fill("2");
-  await page.getByLabel("세트당 개수").fill("5");
+test("member routines stay independent", async ({ page }) => {
+  await page.getByLabel("오늘의 운동").fill("러닝 5km");
+  await page.getByRole("button", { name: "saem 선택" }).click();
+  await expect(page.getByLabel("오늘의 운동")).toHaveValue("");
+  await page.getByLabel("오늘의 운동").fill("필라테스");
 
-  await page.getByRole("button", { name: /시작하기/ }).click();
-  const sensorAlertConfirm = page.getByRole("button", { name: "확인" });
-
-  if (await sensorAlertConfirm.waitFor({ state: "visible", timeout: 1000 }).then(() => true).catch(() => false)) {
-    await sensorAlertConfirm.click();
-  }
-
-  await page.getByRole("button", { name: "바로 시작" }).click();
-  await page.getByRole("button", { name: "수동 +1" }).click();
-  await expect(page.getByText("1/5")).toBeVisible();
-
-  await page.getByRole("button", { name: "현재 세트 완료" }).click();
-  await expect(page.getByText("휴식 중")).toBeVisible();
-  await expect(page.getByText("완료 5/10개 · 50%")).toBeVisible();
+  await page.getByRole("button", { name: "taem 선택" }).click();
+  await expect(page.getByLabel("오늘의 운동")).toHaveValue("러닝 5km");
 });
 
-test("share flow asks which background to use", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("세트 수").fill("1");
-  await page.getByLabel("세트당 개수").fill("1");
+test("photo and workout check complete today's certification", async ({ page }) => {
+  const certifyButton = page.getByRole("button", { name: "오늘 인증 남기기" });
 
-  await page.getByRole("button", { name: /시작하기/ }).click();
-  const sensorAlertConfirm = page.getByRole("button", { name: "확인" });
+  await expect(certifyButton).toBeDisabled();
+  await page.getByLabel("오늘의 운동").fill("웨이트 40분");
+  await page.getByRole("button", { name: "운동 완료" }).click();
+  await page.getByLabel("운동 사진 선택").setInputFiles("app/icon.svg");
+  await expect(page.getByRole("img", { name: "taem 운동 인증 미리보기" })).toBeVisible();
+  await expect(certifyButton).toBeEnabled();
+  await certifyButton.click();
 
-  if (await sensorAlertConfirm.waitFor({ state: "visible", timeout: 1000 }).then(() => true).catch(() => false)) {
-    await sensorAlertConfirm.click();
-  }
-
-  await page.getByRole("button", { name: "바로 시작" }).click();
-  await page.getByRole("button", { name: "수동 +1" }).click();
-
-  await expect(page.getByRole("heading", { name: "1개 완료" })).toBeVisible();
-  await page.getByRole("button", { name: "공유" }).click();
-
-  await expect(page.getByRole("dialog", { name: "공유 배경 선택" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "workout-bg", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "workout-bg2", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "오늘 인증 완료" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "taem 인증 완료" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("img", { name: "taem의 오늘 운동 사진" })).toBeVisible();
 });

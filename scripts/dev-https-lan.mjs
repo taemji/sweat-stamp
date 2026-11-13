@@ -96,7 +96,7 @@ function createSelfSignedCertificate(lanHost) {
 
   const attrs = [
     { name: "commonName", value: lanHost },
-    { name: "organizationName", value: "Squat Coach Development" },
+    { name: "organizationName", value: "Sweat Stamp Development" },
   ];
 
   cert.setSubject(attrs);

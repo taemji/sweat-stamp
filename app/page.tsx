@@ -1,5 +1,5 @@
-import { SquatCoachApp } from "@/components/squat-coach-app";
+import { SweatStampApp } from "@/components/sweat-stamp-app";
 
 export default function Page() {
-	return <SquatCoachApp />;
+	return <SweatStampApp />;
 }

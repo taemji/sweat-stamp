@@ -1,23 +1,21 @@
-# Squat Coach
+# 땀도장
 
-휴대폰 모션 센서로 스쿼트 개수를 세는 모바일 우선 운동 카운터입니다. 수동 카운트도 지원하며, 목표 개수, 운동 시간, 완료 기록, 연속 운동일, 공유용 운동 결과 이미지를 제공합니다.
+`taem`, `saem`, `yum`, `ssuk` 네 사람이 매일 자신의 운동을 체크하고 사진으로 인증하는 모바일 우선 PWA입니다.
 
 ## 주요 기능
 
-- `DeviceMotionEvent` 기반 스쿼트 자동 카운트
-- 센서가 막히거나 데스크톱에서 테스트할 때 사용할 수 있는 수동 `+1` 카운트
-- 목표 개수 설정, 카운트다운, 진행률, 완료 화면
-- 좁은 휴대폰 화면에 맞춘 한국어 모바일 UI
-- 사용자별 운동 완료 기록, 달력, 연속 운동일 표시
-- 완료 기록 공유 이미지 생성
-- Redis 설정이 없어도 카운트 기능은 계속 동작하는 graceful fallback
+- 네 사람에게 각각 다른 색상과 캐릭터가 적용되는 개인 인증 화면
+- 사람마다 독립적으로 저장되는 오늘의 운동
+- 운동 완료 체크와 카메라·앨범 사진 첨부
+- 브라우저를 닫아도 유지되는 오늘 인증 상태와 사진
+- 네 사람의 오늘 인증 현황을 한 화면에서 확인
 
 ## 기술 스택
 
 - **Framework**: Next.js 16 App Router
 - **UI**: React 19, Tailwind CSS 4, shadcn/ui, Radix UI, Base UI
 - **Icons**: Lucide React
-- **Persistence**: Upstash Redis REST API
+- **Persistence**: LocalStorage, IndexedDB
 - **Testing**: Vitest, Testing Library, Playwright
 - **Package manager**: Bun
 
@@ -32,11 +30,11 @@ bun dev
 
 [http://localhost:3000](http://localhost:3000)에서 확인할 수 있습니다.
 
-HTTP 서버는 데스크톱 UI 작업이나 수동 카운트 테스트에는 충분합니다. 다른 휴대폰에서 실제 모션 센서를 테스트하려면 HTTPS 개발 서버를 사용해야 합니다.
+HTTP 서버는 데스크톱 UI 작업에 충분합니다. 다른 휴대폰에서 카메라 촬영을 테스트하려면 HTTPS 개발 서버를 사용합니다.
 
-## 휴대폰 센서 테스트
+## 휴대폰 카메라 테스트
 
-모바일 브라우저에서 모션 센서 접근은 보안 컨텍스트가 필요할 수 있습니다. 실제 휴대폰에서 자동 카운트를 테스트할 때는 HTTPS 개발 서버를 실행합니다.
+모바일 브라우저에서 카메라 접근은 보안 컨텍스트가 필요할 수 있습니다. 실제 휴대폰에서 촬영을 테스트할 때는 HTTPS 개발 서버를 실행합니다.
 
 ```bash
 bun run dev:https
@@ -62,38 +60,11 @@ Windows PowerShell에서는 다음처럼 지정합니다.
 $env:LAN_IP="192.168.1.167"; bun run dev:https
 ```
 
-브라우저에 따라 모션 센서 권한 요청이 표시될 수 있습니다. 시작 버튼을 누른 뒤 권한 팝업이 뜨면 허용해야 자동 카운트가 동작합니다.
-
-## 스쿼트 카운트 방식
-
-이 앱은 카메라 포즈 인식을 사용하지 않습니다. 휴대폰 가속도 데이터를 사용합니다.
-
-1. 운동 시작 시 약 2.5초 동안 기준 자세의 중력 방향을 측정합니다.
-2. 이후 들어오는 센서 샘플을 기준 중력 방향에 투영해 수직 이동량을 추정합니다.
-3. `standing -> down -> bottom -> rising -> standing` 상태 머신으로 움직임을 추적합니다.
-4. 충분한 깊이에 도달한 뒤 다시 선 자세 근처로 돌아오면 1회로 카운트합니다.
-
-폰은 세로로 가슴 앞에 두 손으로 고정하는 것을 권장합니다. 시작 카운트다운 동안 선 자세에서 폰을 움직이지 않아야 기준 중력 방향을 정확히 측정할 수 있습니다. 운동 중 손목만 꺾거나 폰을 크게 회전시키면 수직 움직임 신호가 약해질 수 있으므로, 폰과 상체가 함께 내려갔다 올라오도록 유지합니다.
-
-모션 판정 로직은 [lib/squat-motion.ts](./lib/squat-motion.ts)에 있고, 관련 테스트는 [lib/squat-motion.test.ts](./lib/squat-motion.test.ts)에 있습니다.
+브라우저가 요청하는 카메라 권한을 허용하면 촬영 화면을 사용할 수 있습니다. 앨범에서 기존 사진을 선택하는 것도 가능합니다.
 
 ## 기록 저장
 
-운동 요약은 Upstash Redis에 저장합니다. Vercel KV 형식의 환경변수를 사용할 수 있습니다.
-
-```bash
-KV_REST_API_URL=...
-KV_REST_API_TOKEN=...
-```
-
-또는 Upstash REST 환경변수를 사용할 수 있습니다.
-
-```bash
-UPSTASH_REDIS_REST_URL=...
-UPSTASH_REDIS_REST_TOKEN=...
-```
-
-환경변수가 없어도 앱은 실행되고 카운트 기능도 동작합니다. 이 경우 요약 조회와 완료 저장 API는 `503`을 반환하며, UI에는 비차단 안내 메시지가 표시됩니다.
+운동명과 완료 상태는 LocalStorage에, 인증 사진은 IndexedDB에 저장합니다. 현재는 한 기기의 한 브라우저 안에서만 기록이 유지됩니다. 여러 기기 동기화는 이후 서버 저장소를 연결해야 합니다.
 
 ## 스크립트
 
@@ -117,8 +88,7 @@ bunx playwright install chromium
 ## 프로젝트 구조
 
 - [app/page.tsx](./app/page.tsx): 앱 진입점
-- [components/squat-coach-app.tsx](./components/squat-coach-app.tsx): 클라이언트 운동 플로우
-- [lib/squat-motion.ts](./lib/squat-motion.ts): 스쿼트 모션 판정 로직
-- [lib/workout-summary.ts](./lib/workout-summary.ts): 날짜, 달력, 연속 운동일 계산
-- [lib/share-image.ts](./lib/share-image.ts): 공유 이미지 생성
+- [components/sweat-stamp-app.tsx](./components/sweat-stamp-app.tsx): 4인 사진 인증 플로우
+- [lib/member-profiles.ts](./lib/member-profiles.ts): 사람별 이름, 색상, 캐릭터 설정
+- [lib/certification-photo-store.ts](./lib/certification-photo-store.ts): IndexedDB 사진 저장
 - [CLAUDE.md](./CLAUDE.md), [AGENTS.md](./AGENTS.md): 저장소 작업 규칙과 아키텍처 지침

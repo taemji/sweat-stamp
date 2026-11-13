@@ -2,37 +2,25 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Squat Coach",
-    short_name: "Squat Coach",
-    description: "Mobile squat counter with motion-based form tracking",
+    name: "땀도장",
+    short_name: "땀도장",
+    description: "네 사람의 매일 운동을 사진으로 남기는 인증 앱",
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#f5f7fb",
-    theme_color: "#17c964",
+    background_color: "#f4f3ef",
+    theme_color: "#151515",
     icons: [
       {
-        src: "/icon-192.png",
-        sizes: "192x192",
-        type: "image/png",
+        src: "/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
         purpose: "any",
       },
       {
-        src: "/icon-192.png",
-        sizes: "192x192",
-        type: "image/png",
-        purpose: "maskable",
-      },
-      {
-        src: "/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: "/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
+        src: "/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
         purpose: "maskable",
       },
     ],

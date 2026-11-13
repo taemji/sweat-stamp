@@ -6,9 +6,9 @@ These instructions apply to the entire repository. Project-specific instructions
 
 ## Project Snapshot
 
-This is a mobile-first Squat Coach app built with Next.js 16 App Router, React 19, Tailwind CSS 4, shadcn/ui, Radix/Base UI, Lucide icons, Upstash Redis, Vitest, Testing Library, and Playwright. The package manager is Bun.
+This is a mobile-first Sweat Stamp photo certification app built with Next.js 16 App Router, React 19, Tailwind CSS 4, shadcn/ui, Radix/Base UI, Lucide icons, IndexedDB, Vitest, Testing Library, and Playwright. The package manager is Bun.
 
-`README.md` is the user-facing project overview. The current product is a Korean-language squat counter that tracks reps from phone motion, supports manual counting, saves workout completions, shows streak/calendar summaries, and generates shareable workout images.
+`README.md` is the user-facing project overview. The current product is a Korean-language workout certification app for taem, saem, yum, and ssuk. Each member has an independent theme, character, routine, photo, and daily completion state.
 
 ## Start Here
 
@@ -22,33 +22,29 @@ This is a mobile-first Squat Coach app built with Next.js 16 App Router, React 1
 
 - User-facing UI copy is Korean and should stay natural Korean unless a task explicitly changes language.
 - The app is designed for a narrow mobile viewport (`max-w-[430px]`) with a native-app feel. Verify mobile layout carefully when touching UI.
-- Follow the existing visual system in `app/globals.css`: `--coach-*` tokens, Noto Sans KR, rounded mobile panels, green accent, and compact dashboard-like surfaces.
+- Follow the existing visual system in `app/globals.css`: member theme tokens, a Korean system font stack, compact panels, and person-specific accents.
 - Prefer Lucide icons for actions and existing shadcn/ui components for controls.
 - Preserve accessibility affordances already present: semantic headings, labels, `aria-live` where useful, and role/name-friendly controls for Playwright tests.
-- Device motion and Web Share are browser/device capabilities. Keep permission-denied, unsupported, and fallback paths working.
+- Camera capture and IndexedDB are browser/device capabilities. Keep album selection and storage failure paths working.
 
 ## Architecture Map
 
-- `app/page.tsx` should remain a thin App Router entry that renders `SquatCoachApp`.
-- `app/layout.tsx` owns metadata, icons, Korean HTML language, Noto Sans KR, and the theme provider.
-- `components/squat-coach-app.tsx` owns the client workout flow: setup, countdown, active counting, completion, sensor permission, audio/speech feedback, persistence calls, and sharing.
+- `app/page.tsx` should remain a thin App Router entry that renders `SweatStampApp`.
+- `app/layout.tsx` owns metadata, Korean HTML language, and the theme provider.
+- `components/sweat-stamp-app.tsx` owns member selection, routines, photo selection, completion, and local persistence coordination.
 - `components/ui/*` contains shadcn-generated primitives. Do not edit these directly unless the task is explicitly about the primitive itself; prefer variants, semantic tokens, CSS variables, or wrapper composition.
-- `lib/squat-motion.ts` is the motion algorithm boundary. Any changes to squat detection, calibration, vertical travel, or rep counting need focused tests in `lib/squat-motion.test.ts`.
-- `lib/workout-summary.ts` owns date formatting, monthly calendar days, and streak calculation. Date/streak changes need tests in `lib/workout-summary.test.ts`.
-- `lib/share-image.ts` owns canvas-based PNG generation and depends on `/public/workout-bg.png`. Keep text positioning, Korean units, and fallback rendering in mind.
-- `lib/squat-users.ts` is the user allowlist. API routes and UI selection should continue to validate against it.
-- `app/api/workouts/*` are the server persistence boundary using Upstash Redis. Validate all request/query input at the route edge.
-- `public/*` contains app icons and share/background assets. If icon assets change, check `app/layout.tsx` and `app/manifest.ts` together.
+- `lib/member-profiles.ts` is the single source for member IDs, display names, colors, character variants, and screen copy.
+- `lib/certification-photo-store.ts` owns IndexedDB photo persistence. Keep browser failure handling and database upgrades backward compatible.
+- `app/icon.svg` is the product icon. If it changes, check `app/manifest.ts` at the same time.
 
 Respect the dependency direction in `CLAUDE.md`: lower-level modules should not import higher-level modules. In this repo, `lib` must not depend on `components` or `app`; shared logic belongs in `lib`.
 
 ## Data And Runtime Notes
 
-- Workout records are stored in Redis hashes under `squat:workout-completions:${userId}`.
-- Redis environment variables may be either Vercel KV names (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) or Upstash names (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`).
-- Missing Redis configuration is handled as a 503 and the UI shows a non-blocking message. Keep this graceful degradation.
-- Completion saves are idempotent by date and keep the max observed `count` and `elapsedSeconds`.
-- Do not commit secrets or real credentials. Avoid logging full request payloads.
+- Routine text and certification metadata are stored in LocalStorage.
+- Certification photos are stored in the `sweat-stamp` IndexedDB database.
+- Data is currently device- and browser-local; do not imply cross-device sync in UI copy.
+- Do not commit secrets or real credentials.
 
 ## Commands
 
@@ -70,9 +66,8 @@ Before running E2E for the first time in a fresh environment, install Chromium w
 - Every behavioral change needs measurable acceptance criteria and the lowest useful test boundary.
 - Keep Vitest tests colocated as `<file>.test.ts` / `<file>.test.tsx`.
 - Keep Playwright specs in `e2e/*.spec.ts`.
-- Motion algorithm changes should cover shallow dips, valid depth, adaptive depth, calibration/baseline behavior, and noisy or boundary travel sequences when relevant.
-- Date/streak changes should cover missed days, invalid dates, month padding, and local-date behavior.
-- API route changes should cover validation failures, missing Redis configuration, and persistence summaries when practical.
+- Member profile changes should verify all four IDs and independent visual identities.
+- Photo persistence changes should cover saving, browser reload restoration, deletion, and storage errors when practical.
 - UI flow changes should update Playwright assertions for visible Korean copy, labels, and primary controls.
 - For doc-only changes, tests are usually unnecessary; say that explicitly in the final response.
 
