@@ -36,6 +36,7 @@ import {
   migrateMemberRecord,
   migrateSelectedMemberId,
 } from "@/lib/member-id-migration";
+import { createStampedPhoto, formatStampDateTime } from "@/lib/stamp-photo";
 
 interface Certification {
   completedAt: string;
@@ -172,9 +173,10 @@ export function SweatStampApp() {
   const [routines, setRoutines] = useState<RoutineMap>({});
   const [certifications, setCertifications] = useState<CertificationMap>({});
   const [routineChecked, setRoutineChecked] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState<{ file: File; url: string } | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<{ file: File; stampedAt: Date; url: string } | null>(null);
   const [storedPhoto, setStoredPhoto] = useState<{ key: string; url: string } | null>(null);
   const [saveError, setSaveError] = useState("");
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasHydrated, setHasHydrated] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -283,16 +285,31 @@ export function SweatStampApp() {
     setPhotoPreview(null);
   }
 
-  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    event.target.value = "";
 
     if (!file) {
       return;
     }
 
-    setPhotoPreview({ file, url: URL.createObjectURL(file) });
+    const stampedAt = new Date();
+    setIsProcessingPhoto(true);
     setSaveError("");
-    event.target.value = "";
+
+    try {
+      const stampedPhoto = await createStampedPhoto(file, {
+        accent: selectedMember.accent,
+        memberName: selectedMember.name,
+        stampedAt,
+      });
+      setPhotoPreview({ file: stampedPhoto, stampedAt, url: URL.createObjectURL(stampedPhoto) });
+    } catch (error) {
+      setPhotoPreview(null);
+      setSaveError(error instanceof Error ? error.message : "사진을 처리하지 못했어요.");
+    } finally {
+      setIsProcessingPhoto(false);
+    }
   }
 
   function clearPhoto() {
@@ -312,7 +329,7 @@ export function SweatStampApp() {
       setCertifications((currentCertifications) => ({
         ...currentCertifications,
         [certificationKey]: {
-          completedAt: new Date().toISOString(),
+          completedAt: photoPreview.stampedAt.toISOString(),
           memberId: selectedMemberId,
           photoName: photoPreview.file.name,
           routine: routine.trim(),
@@ -484,14 +501,18 @@ export function SweatStampApp() {
                 <span className="photo-name">{photoPreview.file.name}</span>
               </div>
             ) : (
-              <button type="button" className="photo-picker" onClick={() => photoInputRef.current?.click()}>
+              <button type="button" className="photo-picker" disabled={isProcessingPhoto} onClick={() => photoInputRef.current?.click()}>
                 <span className="photo-picker-icon"><CameraIcon /></span>
-                <strong>운동 사진 찍기</strong>
-                <span>카메라 또는 앨범</span>
+                <strong>{isProcessingPhoto ? "인증 정보 넣는 중" : "운동 사진 찍기"}</strong>
+                <span>{isProcessingPhoto ? "잠시만 기다려 주세요" : "카메라 또는 앨범"}</span>
               </button>
             )}
 
             {saveError && <p className="text-sm font-medium text-destructive" role="alert">{saveError}</p>}
+
+            {photoPreview && (
+              <p className="photo-stamp-caption">사진에 {selectedMember.name} · {formatStampDateTime(photoPreview.stampedAt)} 인증 정보가 저장돼요.</p>
+            )}
 
             <Button type="button" size="lg" className="h-14 gap-2 bg-[var(--member-accent)] text-white hover:bg-[var(--member-accent)]/90" disabled={!canCertify || isSaving} onClick={certifyToday}>
               <ImagePlusIcon />

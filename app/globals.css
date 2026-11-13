@@ -630,6 +630,15 @@
     white-space: nowrap;
   }
 
+  .photo-stamp-caption {
+    margin-top: -0.35rem;
+    color: color-mix(in srgb, var(--member-ink) 58%, transparent);
+    font-size: 0.72rem;
+    font-weight: 650;
+    line-height: 1.45;
+    text-align: center;
+  }
+
   .stamp-mark {
     display: grid;
     width: 9rem;

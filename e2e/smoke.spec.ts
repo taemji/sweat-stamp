@@ -72,8 +72,47 @@ test("photo and workout check complete today's certification", async ({ page }) 
   await expect(certifyButton).toBeDisabled();
   await page.getByLabel("오늘의 운동").fill("웨이트 40분");
   await page.getByRole("button", { name: "운동 완료" }).click();
-  await page.getByLabel("운동 사진 선택").setInputFiles("app/icon.svg");
+  const workoutPhoto = await page.screenshot({ type: "png" });
+  await page.getByLabel("운동 사진 선택").setInputFiles({
+    name: "workout.png",
+    mimeType: "image/png",
+    buffer: workoutPhoto,
+  });
   await expect(page.getByRole("img", { name: "TAEM 운동 인증 미리보기" })).toBeVisible();
+  await expect(page.getByText(/사진에 TAEM · .* 인증 정보가 저장돼요/)).toBeVisible();
+
+  const stampedPhoto = await page.locator(".photo-preview").evaluate(async (preview) => {
+    const backgroundImage = getComputedStyle(preview).backgroundImage;
+    const photoUrl = backgroundImage.slice(5, -2);
+    const photoBlob = await fetch(photoUrl).then((response) => response.blob());
+    const bitmap = await createImageBitmap(photoBlob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Canvas context unavailable");
+    }
+
+    context.drawImage(bitmap, 0, 0);
+    const upperPixel = context.getImageData(Math.floor(bitmap.width / 2), Math.floor(bitmap.height * 0.35), 1, 1).data;
+    const lowerPixel = context.getImageData(Math.floor(bitmap.width / 2), Math.floor(bitmap.height * 0.94), 1, 1).data;
+    bitmap.close();
+
+    return {
+      height: canvas.height,
+      lowerBrightness: lowerPixel[0] + lowerPixel[1] + lowerPixel[2],
+      type: photoBlob.type,
+      upperBrightness: upperPixel[0] + upperPixel[1] + upperPixel[2],
+      width: canvas.width,
+    };
+  });
+
+  expect(stampedPhoto.type).toBe("image/jpeg");
+  expect(stampedPhoto.width).toBeGreaterThan(0);
+  expect(stampedPhoto.height).toBeGreaterThan(0);
+  expect(stampedPhoto.lowerBrightness).toBeLessThan(stampedPhoto.upperBrightness);
   await expect(certifyButton).toBeEnabled();
   await certifyButton.click();
 
