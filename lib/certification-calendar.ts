@@ -5,12 +5,26 @@ export interface CalendarDay {
 
 export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 
-export function getLocalDateKey(date = new Date()) {
+export function getLocalDateKey(date = new Date(), timeZone?: string) {
+  if (timeZone) {
+    return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  }
+
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+export function formatDayLabel(date: Date, timeZone?: string) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric" })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value.toUpperCase()]),
+  );
+
+  return `${parts.weekday} · ${parts.month} ${parts.day}`;
 }
 
 export function getMonthCalendarDays(month: Date): CalendarDay[] {
@@ -41,7 +55,9 @@ export function shiftMonth(month: Date, offset: number) {
   return new Date(month.getFullYear(), month.getMonth() + offset, 1);
 }
 
-export function getWeekDateKeys(date = new Date()) {
+export function getWeekDateKeys(todayKey: string) {
+  const [year, month, day] = todayKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
   const daysSinceMonday = (date.getDay() + 6) % 7;
 
   return Array.from({ length: 7 }, (_, index) => (

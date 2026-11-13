@@ -1,6 +1,7 @@
 export const MEMBER_PROFILES = [
   {
     id: "taem",
+    timeZone: "Asia/Seoul",
     name: "TAEM",
     mainWorkout: "Ballet",
     subWorkout: "Stretching",
@@ -14,6 +15,7 @@ export const MEMBER_PROFILES = [
   },
   {
     id: "sam",
+    timeZone: "Australia/Sydney",
     name: "SAM",
     mainWorkout: "Pilates",
     subWorkout: "Stretching",
@@ -27,6 +29,7 @@ export const MEMBER_PROFILES = [
   },
   {
     id: "sook",
+    timeZone: "Asia/Seoul",
     name: "SOOK",
     mainWorkout: "Pilates",
     subWorkout: "Stretching",
@@ -40,6 +43,7 @@ export const MEMBER_PROFILES = [
   },
   {
     id: "yoom",
+    timeZone: "Asia/Seoul",
     name: "YOOM",
     mainWorkout: "Diet Dance",
     subWorkout: "Stretching",
@@ -52,6 +56,8 @@ export const MEMBER_PROFILES = [
     ink: "#2e2040",
   },
 ] as const;
+
+export const TEAM_TIME_ZONE = "Asia/Seoul";
 
 export const TEAM_THEME = {
   accent: "#94650f",

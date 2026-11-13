@@ -16,7 +16,7 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 ## Scenarios
 
 ### S1. Header and navigation
-- The header shows `Sweat Stamp`. A storage notice appears only when shared storage failed (`공동 저장에 연결하지 못해 이 기기에만 저장돼요`) or is not configured (`이 기기에 저장`).
+- The header shows `Sweat Stamp`. A storage notice appears only when shared storage failed (`공동 저장에 연결하지 못해 이 기기에만 저장돼요`). Without Supabase configuration (local development) the app saves on the device without a notice.
 - The navigation shows each member's face. The selected member also shows their name, and members who certified today show a check labelled `인증 완료`.
 - The calendar button opens the shared calendar.
 
@@ -30,15 +30,15 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 - A typed workout is kept for the day it was entered. On a later day, or when the field is cleared, the main workout is selected again. Routines saved without a date are ignored.
 
 ### S4. Certifying
-- `오늘 인증 남기기` is enabled once `운동 완료` is checked and storage is ready. While it is disabled, a hint above it says why (`공동 저장에 연결하는 중이에요.` or `운동 완료를 체크하면 도장을 찍을 수 있어요.`).
+- One button, `오늘 <workout> 완료 · 도장 찍기`, certifies the workout. It is disabled only while shared storage is connecting, with the hint `공동 저장에 연결하는 중이에요.` above it.
 - With no photo selected, the photo area shows the main workout illustration with a preview of the stamp, and certifying saves that illustration with the `SWEAT STAMP`, member name, and date-time stamp.
 - Choosing a camera or album photo stamps and saves that photo instead.
 - After certifying, the sheet shows the stamped photo (`<NAME>의 오늘 운동 사진`), the workout, `<time>에 찍은 도장`, and a `다시 인증` button.
 
 ### S5. Shared calendar
 - The hero says how many members certified today: `오늘 첫 도장은 누가 찍을까요?`, `<total>명 중 <n>명이 도장 찍었어요.`, or `오늘은 모두 해냈어요.`
-- Below the greeting, the four characters from `team_lineup.png` stand in a row. Characters who certified today are shown in full color, the others are faded, and tapping a character opens that member's screen.
-- The month grid starts on Monday, shows only the weeks it needs, and marks each day with a dot per certified member.
+- Below the greeting, the four characters from `team_lineup.png` stand in a row. Characters who certified today are shown in full color, the others are faded, and tapping a character opens that member's screen. Each character shows this month's count under their feet.
+- The month grid starts on Monday, shows only the weeks it needs, and marks each day with a dot per certified member. There is no separate per-member list.
 
 ### S6. App icon and share image
 - The app icon, Apple touch icon, and PWA manifest icons use the four-character face image.
@@ -51,7 +51,7 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 3. Each member has a distinct portrait, avatar, and workout image path, and each file exists under `public/`.
 4. E2E: a member screen shows `<NAME> 캐릭터` as an image and the main workout row selected.
 5. E2E: tapping `Stretching` selects it; a custom workout survives a reload on the same day; a workout from an earlier day and a cleared field fall back to the main workout.
-6. E2E: with `운동 완료` checked and no photo selected, certification succeeds, the greeting changes to `오늘도 해냈어요.`, and a stamped JPEG photo survives a reload.
+6. E2E: with no photo selected, tapping `오늘 <workout> 완료 · 도장 찍기` certifies, the greeting changes to `오늘도 해냈어요.`, and a stamped JPEG photo survives a reload.
 7. E2E: the calendar greeting and the character row reflect today's certifications.
 8. The manifest lists PNG icons that exist under `public/`, including a maskable icon.
 

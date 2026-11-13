@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   WEEKDAY_LABELS,
+  formatDayLabel,
   getLocalDateKey,
   getMonthCalendarDays,
   getWeekDateKeys,
@@ -42,20 +43,34 @@ describe("certification calendar", () => {
   });
 
   it("lists the Monday-to-Sunday week around a date, across month ends", () => {
-    expect(getWeekDateKeys(new Date(2026, 10, 14))).toEqual([
+    expect(getWeekDateKeys("2026-11-14")).toEqual([
       "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15",
     ]);
-    expect(getWeekDateKeys(new Date(2026, 10, 29))[0]).toBe("2026-11-23");
-    expect(getWeekDateKeys(new Date(2026, 11, 2))).toEqual([
+    expect(getWeekDateKeys("2026-11-29")[0]).toBe("2026-11-23");
+    expect(getWeekDateKeys("2026-12-02")).toEqual([
       "2026-11-30", "2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04", "2026-12-05", "2026-12-06",
     ]);
   });
 
   it("labels weekdays in the same Monday-first order as the grids", () => {
-    const week = getWeekDateKeys(new Date(2026, 10, 14));
+    const week = getWeekDateKeys("2026-11-14");
 
     expect(WEEKDAY_LABELS).toEqual(["월", "화", "수", "목", "금", "토", "일"]);
     expect(new Date(`${week[0]}T00:00:00`).getDay()).toBe(1);
     expect(new Date(`${week[6]}T00:00:00`).getDay()).toBe(0);
+  });
+
+  it("reads today's date in a member's time zone", () => {
+    const lateEveningInSeoul = new Date("2026-11-14T14:30:00Z");
+
+    expect(getLocalDateKey(lateEveningInSeoul, "Asia/Seoul")).toBe("2026-11-14");
+    expect(getLocalDateKey(lateEveningInSeoul, "Australia/Sydney")).toBe("2026-11-15");
+  });
+
+  it("labels the day in a member's time zone", () => {
+    const lateEveningInSeoul = new Date("2026-11-14T14:30:00Z");
+
+    expect(formatDayLabel(lateEveningInSeoul, "Asia/Seoul")).toBe("SAT · NOV 14");
+    expect(formatDayLabel(lateEveningInSeoul, "Australia/Sydney")).toBe("SUN · NOV 15");
   });
 });

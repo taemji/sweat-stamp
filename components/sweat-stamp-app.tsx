@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   WEEKDAY_LABELS,
+  formatDayLabel,
   getLocalDateKey,
   getMonthCalendarDays,
   getWeekDateKeys,
@@ -33,6 +34,7 @@ import { formatKoreanHeadcount, formatKoreanOrdinal } from "@/lib/korean-format"
 import {
   MEMBER_PROFILES,
   TEAM_THEME,
+  TEAM_TIME_ZONE,
   getMemberProfile,
   isMemberId,
   type MemberId,
@@ -108,7 +110,6 @@ interface CalendarOverviewProps {
   todayKey: string;
   visibleMonth: Date;
   onChangeMonth: (offset: number) => void;
-  onSelectMember: (memberId: MemberId) => void;
 }
 
 function CalendarOverview({
@@ -116,10 +117,8 @@ function CalendarOverview({
   todayKey,
   visibleMonth,
   onChangeMonth,
-  onSelectMember,
 }: CalendarOverviewProps) {
   const calendarDays = getMonthCalendarDays(visibleMonth);
-  const monthPrefix = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, "0")}`;
   const monthName = new Intl.DateTimeFormat("en-US", { month: "long" }).format(visibleMonth);
 
   return (
@@ -166,27 +165,6 @@ function CalendarOverview({
           })}
         </div>
       </div>
-
-      <div className="calendar-member-summary" aria-label="이번 달 멤버별 인증 횟수">
-        {MEMBER_PROFILES.map((member) => {
-          const total = Object.keys(certifications).filter((key) => key.startsWith(`${monthPrefix}-`) && key.endsWith(`:${member.id}`)).length;
-
-          return (
-            <button
-              key={member.id}
-              type="button"
-              className="calendar-member-row"
-              style={{ "--summary-color": member.accent, "--summary-soft": member.accentSoft } as CSSProperties}
-              aria-label={`${member.name} 이번 달 ${total}회, 인증 화면 열기`}
-              onClick={() => onSelectMember(member.id)}
-            >
-              <Image className="calendar-member-avatar" src={member.avatar} alt="" width={64} height={64} />
-              <strong>{member.name}</strong>
-              <span>{total}회</span>
-            </button>
-          );
-        })}
-      </div>
     </section>
   );
 }
@@ -201,7 +179,6 @@ export function SweatStampApp() {
   });
   const [routines, setRoutines] = useState<RoutineMap>({});
   const [certifications, setCertifications] = useState<CertificationMap>({});
-  const [routineChecked, setRoutineChecked] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<{ file: File; stampedAt: Date; url: string } | null>(null);
   const [storedPhoto, setStoredPhoto] = useState<{ key: string; url: string } | null>(null);
   const [saveError, setSaveError] = useState("");
@@ -212,41 +189,38 @@ export function SweatStampApp() {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const selectedMember = getMemberProfile(selectedMemberId);
-  const todayKey = getLocalDateKey();
+  const now = new Date();
+  const teamTodayKey = getLocalDateKey(now, TEAM_TIME_ZONE);
+  const todayKey = getLocalDateKey(now, selectedMember.timeZone);
   const certificationKey = getCertificationKey(selectedMemberId, todayKey);
   const completedCertification = certifications[certificationKey];
   const routine = routines[selectedMemberId] ?? selectedMember.mainWorkout;
   const workoutPresets: string[] = [selectedMember.mainWorkout, selectedMember.subWorkout];
   const isPresetRoutine = workoutPresets.includes(routine);
-  const weekDays = getWeekDateKeys().map((dateKey, index) => ({
+  const weekDays = getWeekDateKeys(todayKey).map((dateKey, index) => ({
     dateKey,
     isDone: Boolean(certifications[getCertificationKey(selectedMemberId, dateKey)]),
     isToday: dateKey === todayKey,
     label: WEEKDAY_LABELS[index],
   }));
   const weeklyStampCount = weekDays.filter((day) => day.isDone).length;
-  const heroDateParts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" })
-      .formatToParts(new Date())
-      .map((part) => [part.type, part.value.toUpperCase()]),
-  );
-  const heroDateLabel = `${heroDateParts.weekday} · ${heroDateParts.month} ${heroDateParts.day}`;
+  const teamDayLabel = formatDayLabel(now, TEAM_TIME_ZONE);
+  const memberDayLabel = formatDayLabel(now, selectedMember.timeZone);
   const memberCount = MEMBER_PROFILES.length;
-  const todayDoneMembers = MEMBER_PROFILES.filter((member) => certifications[getCertificationKey(member.id, todayKey)]);
+  const todayDoneMembers = MEMBER_PROFILES.filter((member) => (
+    certifications[getCertificationKey(member.id, getLocalDateKey(now, member.timeZone))]
+  ));
   const todayDoneIds = new Set<MemberId>(todayDoneMembers.map((member) => member.id));
+  const teamMonthPrefix = `${teamTodayKey.slice(0, 7)}-`;
+  const monthlyCounts = new Map(MEMBER_PROFILES.map((member) => [
+    member.id,
+    Object.keys(certifications).filter((key) => key.startsWith(teamMonthPrefix) && key.endsWith(`:${member.id}`)).length,
+  ]));
   const remainingMemberCount = memberCount - todayDoneMembers.length;
   const isStorageReady = hasHydrated && syncStatus !== "connecting";
-  const syncNotice = syncStatus === "error"
-    ? "공동 저장에 연결하지 못해 이 기기에만 저장돼요"
-    : syncStatus === "local"
-      ? "이 기기에 저장"
-      : "";
-  const certifyHint = !isStorageReady
-    ? "공동 저장에 연결하는 중이에요."
-    : !routineChecked
-      ? "운동 완료를 체크하면 도장을 찍을 수 있어요."
-      : "";
-  const canCertify = isStorageReady && routineChecked && !isProcessingPhoto;
+  const syncNotice = syncStatus === "error" ? "공동 저장에 연결하지 못해 이 기기에만 저장돼요" : "";
+  const certifyHint = isStorageReady ? "" : "공동 저장에 연결하는 중이에요.";
+  const canCertify = isStorageReady && !isProcessingPhoto;
   const isCalendarView = activeView === "calendar";
   const themeStyle = {
     "--member-accent": isCalendarView ? TEAM_THEME.accent : selectedMember.accent,
@@ -309,9 +283,9 @@ export function SweatStampApp() {
     }
 
     window.localStorage.setItem(selectedMemberStorageKey, selectedMemberId);
-    window.localStorage.setItem(routinesStorageKey, JSON.stringify(createDailyRoutines(routines as Record<string, string>, todayKey)));
+    window.localStorage.setItem(routinesStorageKey, JSON.stringify(createDailyRoutines(routines as Record<string, string>, getLocalDateKey())));
     window.localStorage.setItem(certificationsStorageKey, JSON.stringify(certifications));
-  }, [certifications, hasHydrated, routines, selectedMemberId, todayKey]);
+  }, [certifications, hasHydrated, routines, selectedMemberId]);
 
   useEffect(() => {
     if (syncStatus !== "shared") {
@@ -384,13 +358,13 @@ export function SweatStampApp() {
       fontFamily: getStampFontFamily(),
       memberName: selectedMember.name,
       stampedAt,
+      timeZone: selectedMember.timeZone,
     });
   }
 
   function selectMember(memberId: MemberId) {
     setSelectedMemberId(memberId);
     setActiveView(memberId);
-    setRoutineChecked(false);
     setPhotoPreview(null);
   }
 
@@ -506,7 +480,6 @@ export function SweatStampApp() {
       delete nextCertifications[certificationKey];
       return nextCertifications;
     });
-    setRoutineChecked(false);
     setPhotoPreview(null);
   }
 
@@ -516,7 +489,7 @@ export function SweatStampApp() {
         <header className="stamp-header">
           <div className="min-w-0">
             <h1 className="stamp-wordmark">Sweat Stamp</h1>
-            {syncNotice && <p className="stamp-meta" role={syncStatus === "error" ? "status" : undefined}>{syncNotice}</p>}
+            {syncNotice && <p className="stamp-meta" role="status">{syncNotice}</p>}
           </div>
         </header>
 
@@ -562,7 +535,7 @@ export function SweatStampApp() {
           <>
             <section className="stamp-hero team-hero" aria-labelledby="team-heading">
               <div className="hero-copy">
-                <p className="hero-date">{heroDateLabel}</p>
+                <p className="hero-date">{teamDayLabel}</p>
                 <h2 id="team-heading" className="hero-title">
                   {todayDoneMembers.length === 0
                     ? <>오늘 첫 도장은<br />누가 찍을까요</>
@@ -590,7 +563,7 @@ export function SweatStampApp() {
                       className="team-lineup-member"
                       data-done={isDone}
                       style={{ flexGrow: member.lineup.width }}
-                      aria-label={`${member.name} ${isDone ? "오늘 인증 완료" : "오늘 인증 전"}, 인증 화면 열기`}
+                      aria-label={`${member.name} ${isDone ? "오늘 인증 완료" : "오늘 인증 전"}, 이번 달 ${monthlyCounts.get(member.id)}회, 인증 화면 열기`}
                       onClick={() => selectMember(member.id)}
                     >
                       <Image
@@ -600,6 +573,9 @@ export function SweatStampApp() {
                         height={member.lineup.height}
                         priority
                       />
+                      <span className="team-lineup-count" style={{ "--chip-accent": member.accent } as CSSProperties} aria-hidden="true">
+                        {monthlyCounts.get(member.id)}회
+                      </span>
                     </button>
                   );
                 })}
@@ -607,10 +583,9 @@ export function SweatStampApp() {
             </section>
             <CalendarOverview
               certifications={certifications}
-              todayKey={todayKey}
+              todayKey={teamTodayKey}
               visibleMonth={visibleMonth}
               onChangeMonth={(offset) => setVisibleMonth((currentMonth) => shiftMonth(currentMonth, offset))}
-              onSelectMember={selectMember}
             />
           </>
         ) : (
@@ -627,7 +602,7 @@ export function SweatStampApp() {
                 priority
               />
               <div className="hero-copy">
-                <p className="hero-date">{heroDateLabel}{completedCertification ? " · DONE" : ""}</p>
+                <p className="hero-date">{memberDayLabel}{completedCertification ? " · DONE" : ""}</p>
                 {completedCertification ? (
                   <>
                     <h2 id="member-heading" className="hero-title">오늘도<br />해냈어요<span className="hero-dot">.</span></h2>
@@ -675,7 +650,7 @@ export function SweatStampApp() {
                 <div className="complete-summary">
                   <div className="min-w-0">
                     <p className="complete-routine">{completedCertification.routine}</p>
-                    <p className="complete-caption">{formatStampTime(new Date(completedCertification.completedAt))}에 찍은 도장</p>
+                    <p className="complete-caption">{formatStampTime(new Date(completedCertification.completedAt), selectedMember.timeZone)}에 찍은 도장</p>
                   </div>
                   <button type="button" className="complete-retry" onClick={resetCertification}>
                     <RotateCcwIcon aria-hidden="true" />
@@ -719,16 +694,6 @@ export function SweatStampApp() {
                   </label>
                 </div>
 
-                <button
-                  type="button"
-                  className="routine-check"
-                  aria-pressed={routineChecked}
-                  onClick={() => setRoutineChecked((isChecked) => !isChecked)}
-                >
-                  <span className="routine-check-box" aria-hidden="true"><CheckIcon /></span>
-                  운동 완료
-                </button>
-
                 <input
                   ref={photoInputRef}
                   className="sr-only"
@@ -739,13 +704,9 @@ export function SweatStampApp() {
                   onChange={handlePhotoChange}
                 />
 
-                <div className="photo-grid">
+                <div className="photo-frame">
                   {photoPreview ? (
-                    <div className="photo-tile" style={{ backgroundImage: `url(${photoPreview.url})` }} role="img" aria-label={`${selectedMember.name} 운동 인증 미리보기`}>
-                      <button type="button" className="photo-clear" aria-label="사진 지우기" title="사진 지우기" onClick={clearPhoto}>
-                        <XIcon />
-                      </button>
-                    </div>
+                    <div className="photo-tile" style={{ backgroundImage: `url(${photoPreview.url})` }} role="img" aria-label={`${selectedMember.name} 운동 인증 미리보기`} />
                   ) : (
                     <div className="photo-tile">
                       <Image
@@ -753,35 +714,33 @@ export function SweatStampApp() {
                         alt={`${selectedMember.name} 기본 인증 이미지`}
                         width={1080}
                         height={1080}
-                        sizes="12rem"
+                        sizes="(max-width: 480px) 100vw, 440px"
                       />
                       <span className="photo-tile-band" aria-hidden="true">
                         <strong><i />Sweat Stamp</strong>
-                        <small>{selectedMember.name} · {formatStampDateTime(new Date())}</small>
+                        <small>{selectedMember.name} · {formatStampDateTime(now, selectedMember.timeZone)}</small>
                       </span>
                     </div>
                   )}
-                  <button type="button" className="photo-picker" disabled={isProcessingPhoto} onClick={() => photoInputRef.current?.click()}>
-                    <CameraIcon aria-hidden="true" />
-                    <span>
-                      <strong>{isProcessingPhoto ? "인증 정보 넣는 중" : photoPreview ? "다시 찍기" : "내 사진 찍기"}</strong>
-                      <small>{photoPreview ? "다른 사진으로 바꿔요" : "카메라 또는 앨범"}</small>
-                    </span>
-                  </button>
+                  <div className="photo-actions">
+                    {photoPreview && (
+                      <button type="button" className="photo-clear" aria-label="사진 지우기" title="사진 지우기" onClick={clearPhoto}>
+                        <XIcon />
+                      </button>
+                    )}
+                    <button type="button" className="photo-picker" disabled={isProcessingPhoto} onClick={() => photoInputRef.current?.click()}>
+                      <CameraIcon aria-hidden="true" />
+                      {isProcessingPhoto ? "인증 정보 넣는 중" : photoPreview ? "다시 찍기" : "내 사진으로 바꾸기"}
+                    </button>
+                  </div>
                 </div>
-
-                <p className="photo-stamp-caption">
-                  {photoPreview
-                    ? `사진에 ${selectedMember.name} · ${formatStampDateTime(photoPreview.stampedAt)} 인증 정보가 저장돼요.`
-                    : "사진이 없으면 캐릭터 이미지에 스탬프가 찍혀요."}
-                </p>
 
                 {saveError && <p className="text-sm font-medium text-destructive" role="alert">{saveError}</p>}
 
                 {certifyHint && <p className="certify-hint">{certifyHint}</p>}
 
                 <button type="button" className="certify-button" disabled={!canCertify || isSaving} onClick={certifyToday}>
-                  <span>{isSaving ? "사진 저장 중" : "오늘 인증 남기기"}</span>
+                  <span>{isSaving ? "도장 찍는 중" : `오늘 ${routine} 완료 · 도장 찍기`}</span>
                   <span className="certify-button-icon" aria-hidden="true"><ArrowRightIcon /></span>
                 </button>
               </section>

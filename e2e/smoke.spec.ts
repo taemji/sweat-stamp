@@ -17,11 +17,11 @@ test.beforeEach(async ({ page }) => {
 test("home opens the shared calendar before member screens", async ({ page }) => {
   await expect(page).toHaveTitle("Sweat Stamp");
   await expect(page.getByRole("heading", { name: "Sweat Stamp" })).toBeVisible();
-  await expect(page.getByText(/이 기기에 저장/)).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "전체 캘린더" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("공동 인증 캘린더")).toBeVisible();
   await expect(page.getByRole("heading", { name: "오늘 첫 도장은 누가 찍을까요?" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "TAEM 오늘 인증 전, 인증 화면 열기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "TAEM 오늘 인증 전, 이번 달 0회, 인증 화면 열기" })).toBeVisible();
   await expect(page.getByRole("button", { name: "이전 달" })).toBeVisible();
   await expect(page.getByRole("button", { name: "다음 달" })).toBeVisible();
 
@@ -52,6 +52,11 @@ test("main workout is preset and stretching is one tap away", async ({ page }) =
   await page.getByRole("button", { name: "SAM 선택" }).click();
   await expect(page.getByRole("button", { name: "Pilates", exact: true })).toHaveAttribute("aria-pressed", "true");
 
+  const sydneyDay = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "Australia/Sydney", weekday: "short", month: "short", day: "numeric" })
+    .formatToParts(new Date())
+    .map((part) => [part.type, part.value.toUpperCase()]));
+  await expect(page.getByText(`${sydneyDay.weekday} · ${sydneyDay.month} ${sydneyDay.day}`, { exact: true })).toBeVisible();
+
   await page.getByRole("button", { name: "TAEM 선택" }).click();
   await page.getByLabel("오늘의 운동").fill("Barre");
   await expect(page.getByRole("button", { name: "Stretching", exact: true })).toHaveAttribute("aria-pressed", "false");
@@ -63,11 +68,9 @@ test("certifying without a photo stamps the main workout illustration", async ({
   await expect(page.getByText("Diet Dance 하고")).toBeVisible();
   await expect(page.getByLabel("이번 주 0회 인증")).toBeVisible();
   await expect(page.getByRole("img", { name: "YOOM 기본 인증 이미지" })).toBeVisible();
-  await expect(page.getByText("사진이 없으면 캐릭터 이미지에 스탬프가 찍혀요.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "내 사진으로 바꾸기" })).toBeVisible();
 
-  const certifyButton = page.getByRole("button", { name: "오늘 인증 남기기" });
-  await expect(certifyButton).toBeDisabled();
-  await page.getByRole("button", { name: "운동 완료" }).click();
+  const certifyButton = page.getByRole("button", { name: "오늘 Diet Dance 완료 · 도장 찍기" });
   await expect(certifyButton).toBeEnabled();
   await certifyButton.click();
 
@@ -119,7 +122,6 @@ test("a custom workout lasts for today only", async ({ page }) => {
   await page.getByLabel("오늘의 운동").fill("");
   await expect(page.getByRole("button", { name: "Ballet", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Ballet 하고")).toBeVisible();
-  await expect(page.getByText("운동 완료를 체크하면 도장을 찍을 수 있어요.")).toBeVisible();
 });
 
 test("legacy member ids migrate to sam and yoom", async ({ page }) => {
@@ -148,12 +150,10 @@ test("legacy member ids migrate to sam and yoom", async ({ page }) => {
 
 test("photo and workout check complete today's certification", async ({ page }) => {
   await page.getByRole("button", { name: "TAEM 선택" }).click();
-  const certifyButton = page.getByRole("button", { name: "오늘 인증 남기기" });
+  const certifyButton = page.getByRole("button", { name: /도장 찍기$/ });
 
   await page.getByLabel("오늘의 운동").fill("웨이트 40분");
-  await expect(page.getByText("운동 완료를 체크하면 도장을 찍을 수 있어요.")).toBeVisible();
-  await page.getByRole("button", { name: "운동 완료" }).click();
-  await expect(page.getByText("운동 완료를 체크하면 도장을 찍을 수 있어요.")).toBeHidden();
+  await expect(certifyButton).toHaveAccessibleName("오늘 웨이트 40분 완료 · 도장 찍기");
   const workoutPhoto = await page.screenshot({ type: "png" });
   await page.getByLabel("운동 사진 선택").setInputFiles({
     name: "workout.png",
@@ -161,7 +161,6 @@ test("photo and workout check complete today's certification", async ({ page }) 
     buffer: workoutPhoto,
   });
   await expect(page.getByRole("img", { name: "TAEM 운동 인증 미리보기" })).toBeVisible();
-  await expect(page.getByText(/사진에 TAEM · .* 인증 정보가 저장돼요/)).toBeVisible();
 
   const stampedPhoto = await page.getByRole("img", { name: "TAEM 운동 인증 미리보기" }).evaluate(async (preview) => {
     const backgroundImage = getComputedStyle(preview).backgroundImage;
@@ -210,6 +209,5 @@ test("photo and workout check complete today's certification", async ({ page }) 
   await expect(page.getByLabel(`${todayNumber}일, TAEM 인증 완료`)).toBeVisible();
   await expect(page.getByRole("heading", { name: "4명 중 1명이 도장 찍었어요." })).toBeVisible();
   await expect(page.getByText("남은 세 명도 같이 가 볼까요?")).toBeVisible();
-  await expect(page.getByRole("button", { name: "TAEM 오늘 인증 완료, 인증 화면 열기" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "TAEM 이번 달 1회, 인증 화면 열기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "TAEM 오늘 인증 완료, 이번 달 1회, 인증 화면 열기" })).toBeVisible();
 });

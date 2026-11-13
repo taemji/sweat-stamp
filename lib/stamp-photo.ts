@@ -5,15 +5,18 @@ interface StampPhotoOptions {
   fontFamily?: string;
   memberName: string;
   stampedAt: Date;
+  timeZone?: string;
 }
 
-export function formatStampDateTime(stampedAt: Date) {
+export function formatStampDateTime(stampedAt: Date, timeZone?: string) {
   const date = new Intl.DateTimeFormat("ko-KR", {
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(stampedAt);
   const time = new Intl.DateTimeFormat("ko-KR", {
+    timeZone,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -22,8 +25,8 @@ export function formatStampDateTime(stampedAt: Date) {
   return `${date} ${time}`;
 }
 
-export function formatStampTime(stampedAt: Date) {
-  return new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit" }).format(stampedAt);
+export function formatStampTime(stampedAt: Date, timeZone?: string) {
+  return new Intl.DateTimeFormat("ko-KR", { timeZone, hour: "numeric", minute: "2-digit" }).format(stampedAt);
 }
 
 function getOutputDimensions(width: number, height: number) {
@@ -84,7 +87,7 @@ export async function createStampedPhoto(file: File, options: StampPhotoOptions)
   context.fillText("SWEAT STAMP", padding + titleSize * 0.48, dimensions.height - padding - detailSize * 1.42);
   context.font = `600 ${detailSize}px ${fontFamily}`;
   context.fillStyle = "rgba(255, 255, 255, 0.9)";
-  context.fillText(`${options.memberName} · ${formatStampDateTime(options.stampedAt)}`, padding, dimensions.height - padding);
+  context.fillText(`${options.memberName} · ${formatStampDateTime(options.stampedAt, options.timeZone)}`, padding, dimensions.height - padding);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((result) => {

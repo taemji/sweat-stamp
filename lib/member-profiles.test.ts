@@ -22,6 +22,10 @@ describe("member profiles", () => {
     expect(MEMBER_PROFILES.map((member) => member.name)).toEqual(["TAEM", "SAM", "SOOK", "YOOM"]);
   });
 
+  it("keeps SAM on Sydney time and everyone else on Seoul time", () => {
+    expect(MEMBER_PROFILES.map((member) => member.timeZone)).toEqual(["Asia/Seoul", "Australia/Sydney", "Asia/Seoul", "Asia/Seoul"]);
+  });
+
   it("presets each member's main and sub workout in English", () => {
     expect(MEMBER_PROFILES.map((member) => member.mainWorkout)).toEqual(["Ballet", "Pilates", "Pilates", "Diet Dance"]);
     expect(MEMBER_PROFILES.map((member) => member.subWorkout)).toEqual(["Stretching", "Stretching", "Stretching", "Stretching"]);
