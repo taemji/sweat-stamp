@@ -27,6 +27,7 @@ import {
   migrateCertificationPhotoKeys,
   saveCertificationPhoto,
 } from "@/lib/certification-photo-store";
+import { createDailyRoutines, readDailyRoutines } from "@/lib/daily-routines";
 import { loadDefaultWorkoutPhoto } from "@/lib/default-workout-photo";
 import {
   MEMBER_PROFILES,
@@ -236,13 +237,11 @@ export function SweatStampApp() {
       .map((part) => [part.type, part.value.toUpperCase()]),
   );
   const heroDateLabel = `${heroDateParts.weekday} · ${heroDateParts.month} ${heroDateParts.day}`;
-  const syncStatusText = syncStatus === "shared"
-    ? "공동 저장"
-    : syncStatus === "connecting"
-      ? "연결 중"
-      : syncStatus === "error"
-        ? "공동 저장 오류 · 로컬 저장"
-        : "이 기기에 저장";
+  const syncNotice = syncStatus === "error"
+    ? "공동 저장에 연결하지 못해 이 기기에만 저장돼요"
+    : syncStatus === "local"
+      ? "이 기기에 저장"
+      : "";
   const todayDoneMembers = MEMBER_PROFILES.filter((member) => certifications[getCertificationKey(member.id, todayKey)]);
   const remainingMemberCount = MEMBER_PROFILES.length - todayDoneMembers.length;
   const certifyHint = !routine.trim()
@@ -262,19 +261,16 @@ export function SweatStampApp() {
     let isActive = true;
     const frameId = window.requestAnimationFrame(async () => {
       const storedMemberId = window.localStorage.getItem(selectedMemberStorageKey);
-      const storedRoutines = readStoredObject<Record<string, string>>(routinesStorageKey);
+      const todaysRoutines = readDailyRoutines(readStoredObject(routinesStorageKey), getLocalDateKey());
       const storedCertifications = readStoredObject<Record<string, StoredCertification>>(certificationsStorageKey);
       const migratedMemberId = migrateSelectedMemberId(storedMemberId);
-      const migratedRoutines = migrateMemberRecord(storedRoutines ?? {}) as RoutineMap;
       const migratedCertifications = migrateCertificationRecord(storedCertifications ?? {}) as CertificationMap;
 
       if (isMemberId(migratedMemberId)) {
         setSelectedMemberId(migratedMemberId);
       }
 
-      if (storedRoutines) {
-        setRoutines(migratedRoutines);
-      }
+      setRoutines(migrateMemberRecord(todaysRoutines) as RoutineMap);
 
       if (storedCertifications) {
         await migrateCertificationPhotoKeys(getLegacyPhotoKeys(Object.keys(migratedCertifications))).catch(() => undefined);
@@ -316,9 +312,9 @@ export function SweatStampApp() {
     }
 
     window.localStorage.setItem(selectedMemberStorageKey, selectedMemberId);
-    window.localStorage.setItem(routinesStorageKey, JSON.stringify(routines));
+    window.localStorage.setItem(routinesStorageKey, JSON.stringify(createDailyRoutines(routines as Record<string, string>, todayKey)));
     window.localStorage.setItem(certificationsStorageKey, JSON.stringify(certifications));
-  }, [certifications, hasHydrated, routines, selectedMemberId]);
+  }, [certifications, hasHydrated, routines, selectedMemberId, todayKey]);
 
   useEffect(() => {
     if (syncStatus !== "shared") {
@@ -510,7 +506,7 @@ export function SweatStampApp() {
         <header className="stamp-header">
           <div className="min-w-0">
             <h1 className="stamp-wordmark">Sweat Stamp</h1>
-            <p className="stamp-meta">{syncStatusText}</p>
+            {syncNotice && <p className="stamp-meta" role={syncStatus === "error" ? "status" : undefined}>{syncNotice}</p>}
           </div>
           <p className="today-count" aria-label="오늘 인증 수">
             {MEMBER_PROFILES.filter((member) => certifications[getCertificationKey(member.id, todayKey)]).length} / 4 DONE

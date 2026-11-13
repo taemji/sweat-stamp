@@ -99,6 +99,24 @@ test("member routines stay independent", async ({ page }) => {
   await expect(page.getByLabel("오늘의 운동")).toHaveValue("러닝 5km");
 });
 
+test("a custom workout lasts for today only", async ({ page }) => {
+  await page.evaluate(() => {
+    window.localStorage.setItem("sweat-stamp:routines", JSON.stringify({ dateKey: "2020-01-01", routines: { taem: "숨쉬기" } }));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "TAEM 선택" }).click();
+  await expect(page.getByRole("button", { name: "Ballet", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Ballet 하고")).toBeVisible();
+  await expect(page.getByLabel("오늘의 운동")).toHaveValue("");
+
+  await page.getByLabel("오늘의 운동").fill("숨쉬기");
+  await expect(page.getByText("숨쉬기 하고")).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "TAEM 선택" }).click();
+  await expect(page.getByLabel("오늘의 운동")).toHaveValue("숨쉬기");
+  await expect(page.getByRole("button", { name: "Ballet", exact: true })).toHaveAttribute("aria-pressed", "false");
+});
+
 test("legacy member ids migrate to sam and yoom", async ({ page }) => {
   await page.evaluate(() => {
     window.localStorage.setItem("sweat-stamp:selected-member", "saem");
@@ -119,7 +137,7 @@ test("legacy member ids migrate to sam and yoom", async ({ page }) => {
   }));
 
   expect(migratedStorage.selectedMember).toBe("sam");
-  expect(migratedStorage.routines).toEqual({ sam: "필라테스", sook: "수영", yoom: "러닝" });
+  expect(migratedStorage.routines.routines).toEqual({});
   expect(Object.keys(migratedStorage.certifications).sort()).toEqual(["2026-11-13:sam", "2026-11-13:sook", "2026-11-13:yoom"]);
 });
 

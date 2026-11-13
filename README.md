@@ -77,7 +77,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
 ```
 
-3. Vercel에서 새 배포를 실행합니다. 앱 헤더에 `공동 저장`이 표시되면 연결된 상태입니다. `공동 저장 오류 · 로컬 저장`이 보이면 SQL 마이그레이션과 Data API 설정을 확인합니다.
+3. Vercel에서 새 배포를 실행합니다. 연결되면 앱 헤더에 저장 상태 문구가 표시되지 않습니다. `공동 저장에 연결하지 못해 이 기기에만 저장돼요`가 보이면 SQL 마이그레이션과 Data API 설정을 확인합니다. Supabase를 설정하지 않은 로컬 개발 환경에서는 `이 기기에 저장`이 표시됩니다.
 
 이 MVP는 로그인 없이 네 멤버가 사용하는 구조라 RLS가 멤버 ID, 날짜, 파일 경로와 형식을 제한합니다. 공개 배포 후 쓰기 권한을 더 강하게 보호하려면 멤버별 PIN 또는 Supabase Auth를 추가해야 합니다.
 
