@@ -22,7 +22,7 @@ test("home opens the shared calendar before member screens", async ({ page }) =>
   await expect(page.getByRole("button", { name: "이전 달" })).toBeVisible();
   await expect(page.getByRole("button", { name: "다음 달" })).toBeVisible();
 
-  for (const memberName of ["TAEM", "SAEM", "YUM", "SSUK"]) {
+  for (const memberName of ["TAEM", "SAEM", "SSUK", "YUM"]) {
     const memberButton = page.getByRole("button", { name: `${memberName} 선택` });
     await expect(memberButton).toBeVisible();
     await memberButton.click();

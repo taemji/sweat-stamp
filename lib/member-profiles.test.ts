@@ -4,8 +4,9 @@ import { MEMBER_PROFILES, getMemberProfile, isMemberId } from "./member-profiles
 
 describe("member profiles", () => {
   it("defines the four certification members in display order", () => {
-    expect(MEMBER_PROFILES.map((member) => member.id)).toEqual(["taem", "saem", "yum", "ssuk"]);
-    expect(MEMBER_PROFILES.map((member) => member.name)).toEqual(["TAEM", "SAEM", "YUM", "SSUK"]);
+    expect(MEMBER_PROFILES.map((member) => member.id)).toEqual(["taem", "saem", "ssuk", "yum"]);
+    expect(MEMBER_PROFILES.map((member) => member.name)).toEqual(["TAEM", "SAEM", "SSUK", "YUM"]);
+    expect(MEMBER_PROFILES.map((member) => member.accent)).toEqual(["#d94b42", "#f4d600", "#65a94b", "#8c63c7"]);
   });
 
   it("gives every member an independent visual identity", () => {
