@@ -963,6 +963,83 @@
   .day-card[data-done="false"] .day-card-meta strong {
     color: color-mix(in srgb, var(--member-ink) 45%, transparent);
   }
+
+  .day-photo-button {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border-radius: 1rem;
+    cursor: zoom-in;
+  }
+
+  .photo-lightbox {
+    width: min(92vw, 440px);
+    max-width: none;
+    max-height: none;
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: white;
+    overflow: visible;
+  }
+
+  .photo-lightbox::backdrop {
+    background: rgb(0 0 0 / 78%);
+    backdrop-filter: blur(4px);
+  }
+
+  .photo-lightbox-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .photo-lightbox-image {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 72vh;
+    margin-inline: auto;
+    border-radius: 1.25rem;
+  }
+
+  .photo-lightbox-close {
+    position: absolute;
+    z-index: 1;
+    top: -3.25rem;
+    right: 0;
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    place-items: center;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 16%);
+    color: white;
+  }
+
+  .photo-lightbox-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .photo-lightbox-caption {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .photo-lightbox-caption strong {
+    color: var(--card-accent);
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    filter: brightness(1.6);
+  }
 }
 
 @media (max-width: 370px) {

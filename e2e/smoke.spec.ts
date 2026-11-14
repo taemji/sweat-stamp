@@ -242,6 +242,17 @@ test("a calendar day opens everyone's stamps for that day", async ({ page }) => 
   await expect(page.getByRole("heading", { name: dayLabel })).toBeVisible();
   await expect(page.getByLabel("4명 중 1명 인증")).toBeVisible();
   await expect(page.getByRole("img", { name: `YOOM ${dayLabel} 인증 사진` })).toBeVisible();
+
+  await page.getByRole("button", { name: "YOOM 인증 사진 크게 보기" }).click();
+  const lightbox = page.getByRole("dialog", { name: `YOOM ${dayLabel} 인증 사진` });
+  await expect(lightbox).toBeVisible();
+  await expect(lightbox.getByRole("img", { name: `YOOM ${dayLabel} 인증 사진 확대` })).toBeVisible();
+  await expect(lightbox).toContainText("Diet Dance");
+  await page.keyboard.press("Escape");
+  await expect(lightbox).toBeHidden();
+  await page.getByRole("button", { name: "YOOM 인증 사진 크게 보기" }).click();
+  await lightbox.getByRole("button", { name: "닫기" }).click();
+  await expect(lightbox).toBeHidden();
   await expect(page.getByRole("button", { name: "TAEM 화면 열기" })).toContainText("Not yet");
 
   await page.getByRole("button", { name: "캘린더로 돌아가기" }).click();

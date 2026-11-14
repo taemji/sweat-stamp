@@ -252,6 +252,8 @@ interface DayStampsProps {
 
 function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStampsProps) {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [zoomedPhoto, setZoomedPhoto] = useState<{ caption: string; member: MemberProfile; url: string } | null>(null);
+  const lightboxRef = useRef<HTMLDialogElement>(null);
   const photoCacheRef = useRef(new Map<string, CertificationPhotoUrl & { signature: string }>());
   const dateLabel = formatKoreanDate(dateKey);
   const entries = MEMBER_PROFILES.map((member) => {
@@ -329,6 +331,14 @@ function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStamp
     };
   }, []);
 
+  useEffect(() => {
+    const lightbox = lightboxRef.current;
+
+    if (zoomedPhoto && lightbox && !lightbox.open) {
+      lightbox.showModal();
+    }
+  }, [zoomedPhoto]);
+
   return (
     <section className="stamp-sheet day-stamps" aria-labelledby="day-heading">
       <div className="day-stamps-head">
@@ -353,12 +363,23 @@ function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStamp
             style={{ "--card-accent": member.accent, "--card-tint": member.accentSoft } as CSSProperties}
           >
             {certification && photoUrls[key] ? (
-              <div
-                className="day-photo"
-                style={{ backgroundImage: `url(${photoUrls[key]})` }}
-                role="img"
-                aria-label={`${member.name} ${dateLabel} 인증 사진`}
-              />
+              <button
+                type="button"
+                className="day-photo-button"
+                aria-label={`${member.name} 인증 사진 크게 보기`}
+                onClick={() => setZoomedPhoto({
+                  caption: `${certification.routine} · ${formatStampTime(new Date(certification.completedAt), member.timeZone)}`,
+                  member,
+                  url: photoUrls[key],
+                })}
+              >
+                <div
+                  className="day-photo"
+                  style={{ backgroundImage: `url(${photoUrls[key]})` }}
+                  role="img"
+                  aria-label={`${member.name} ${dateLabel} 인증 사진`}
+                />
+              </button>
             ) : (
               <div className="day-photo day-photo-empty" data-done={Boolean(certification)} aria-hidden="true">
                 <Image src={member.portrait} alt="" width={600} height={800} sizes="(max-width: 480px) 50vw, 220px" />
@@ -375,6 +396,36 @@ function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStamp
           </li>
         ))}
       </ul>
+
+      <dialog
+        ref={lightboxRef}
+        className="photo-lightbox"
+        aria-label={zoomedPhoto ? `${zoomedPhoto.member.name} ${dateLabel} 인증 사진` : undefined}
+        onClose={() => setZoomedPhoto(null)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) {
+            event.currentTarget.close();
+          }
+        }}
+      >
+        {zoomedPhoto && (
+          <div className="photo-lightbox-body" style={{ "--card-accent": zoomedPhoto.member.accent } as CSSProperties}>
+            <button type="button" className="photo-lightbox-close" aria-label="닫기" onClick={() => lightboxRef.current?.close()}>
+              <XIcon aria-hidden="true" />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element -- the popup sizes itself to each photo's own ratio */}
+            <img
+              className="photo-lightbox-image"
+              src={zoomedPhoto.url}
+              alt={`${zoomedPhoto.member.name} ${dateLabel} 인증 사진 확대`}
+            />
+            <p className="photo-lightbox-caption">
+              <strong>{zoomedPhoto.member.name}</strong>
+              <span>{zoomedPhoto.caption}</span>
+            </p>
+          </div>
+        )}
+      </dialog>
     </section>
   );
 }

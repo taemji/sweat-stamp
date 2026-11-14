@@ -57,6 +57,7 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 ### S8. Daily stamps page
 - Tapping a past or current day in the calendar opens a page titled with that day (`11월 14일 토요일`), with a back button (`캘린더로 돌아가기`) and `<done> / 4`.
 - Each member has a card: their stamped photo (`<NAME> <day> 인증 사진`) with `<workout> · <time>` in their own time zone, or their faded portrait filling the card with `Not yet`. Tapping a name opens that member's screen.
+- Tapping a stamped photo (`<NAME> 인증 사진 크게 보기`) opens it enlarged in a centered popup with the name and `<workout> · <time>`. The popup closes with `닫기`, a tap outside the photo, or Escape.
 - Future days cannot be opened.
 
 ## Success Criteria
