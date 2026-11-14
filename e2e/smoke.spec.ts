@@ -262,3 +262,21 @@ test("a calendar day opens everyone's stamps for that day", async ({ page }) => 
   await page.getByRole("button", { name: "YOOM 화면 열기" }).click();
   await expect(page.getByRole("heading", { name: "오늘도 해냈어요." })).toBeVisible();
 });
+
+test("the shared calendar counts Seoul's day even after Sydney's midnight", async ({ page }) => {
+  // 23:15 in Seoul on Nov 14 is already 01:15 on Nov 15 in Sydney.
+  await page.clock.setFixedTime(new Date("2026-11-14T14:15:00.000Z"));
+  await page.evaluate(() => {
+    window.localStorage.setItem("sweat-stamp:certifications", JSON.stringify({
+      "2026-11-14:taem": { completedAt: "2026-11-14T13:00:00.000Z", memberId: "taem", photoName: "taem.png", routine: "Ballet" },
+      "2026-11-14:sam": { completedAt: "2026-11-14T00:47:00.000Z", memberId: "sam", photoName: "sam.png", routine: "Pilates" },
+    }));
+  });
+  await page.reload();
+
+  await expect(page.locator("#team-heading")).toContainText("4명 중 2명이");
+  await expect(page.getByRole("button", { name: /^TAEM 오늘 인증 완료/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^SAM 오늘 인증 완료/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^SOOK 오늘 인증 전/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "SAM 선택, 오늘 인증 완료" })).toBeVisible();
+});

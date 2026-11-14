@@ -474,9 +474,9 @@ export function SweatStampApp() {
   const teamDayLabel = formatDayLabel(now, TEAM_TIME_ZONE);
   const memberDayLabel = formatDayLabel(now, selectedMember.timeZone);
   const memberCount = MEMBER_PROFILES.length;
-  const todayDoneMembers = MEMBER_PROFILES.filter((member) => (
-    certifications[getCertificationKey(member.id, getLocalDateKey(now, member.timeZone))]
-  ));
+  // Team status (navigation checks, greeting, character row) counts the team day in Seoul,
+  // the same day the calendar marks as today.
+  const todayDoneMembers = MEMBER_PROFILES.filter((member) => certifications[getCertificationKey(member.id, teamTodayKey)]);
   const todayDoneIds = new Set<MemberId>(todayDoneMembers.map((member) => member.id));
   const certificationKeys = Object.keys(certifications);
   const visibleMonthNumber = visibleMonth.getMonth() + 1;

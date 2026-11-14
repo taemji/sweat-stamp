@@ -48,7 +48,7 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 
 ### S7. Time zones and loading
 - Each member's day, stamp times, weekly strip, and today's status use their own time zone (SAM: Australia/Sydney; others: Asia/Seoul). Calendar dots and monthly counts file each certification under the member's own date, so a SAM stamp just after Sydney midnight on the 1st counts toward the new month even while Seoul is still on the previous day.
-- The shared calendar opens on the current month in Seoul and marks Seoul's today.
+- The shared calendar opens on the current month in Seoul and marks Seoul's today. Its greeting, its character row, and the navigation checks count the certifications filed under Seoul's today, so they match the dots on that day (at 23:15 Seoul on Nov 14, a SAM stamp from Sydney's Nov 14 still counts even though Sydney is already on Nov 15).
 - Until stored certifications have loaded, the screens show `오늘 기록을 불러오는 중이에요.` instead of counts, statuses, or the certify form. Loading gives up after 10 seconds and continues offline.
 - The workout date is the member's date at the time on the stamp, so the photo and the record always agree.
 - `다시 인증` on a shared certification is refused with `인터넷에 다시 연결된 뒤 시도해 주세요.` while shared storage is unreachable.
