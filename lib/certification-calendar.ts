@@ -21,6 +21,11 @@ export function countCertificationsInMonth(keys: string[], memberId: string, mon
   }).length;
 }
 
+export function formatKoreanDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "long" }).format(new Date(year, month - 1, day));
+}
+
 export function getMonthStart(dateKey: string) {
   const [year, month] = dateKey.split("-").map(Number);
   return new Date(year, month - 1, 1);

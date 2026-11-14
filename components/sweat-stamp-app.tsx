@@ -18,6 +18,7 @@ import {
   WEEKDAY_LABELS,
   countCertificationsInMonth,
   formatDayLabel,
+  formatKoreanDate,
   getCertificationKey,
   getLocalDateKey,
   getMonthCalendarDays,
@@ -152,6 +153,7 @@ interface CalendarOverviewProps {
   todayKey: string;
   visibleMonth: Date;
   onChangeMonth: (offset: number) => void;
+  onOpenDay: (dateKey: string) => void;
 }
 
 function CalendarOverview({
@@ -159,6 +161,7 @@ function CalendarOverview({
   todayKey,
   visibleMonth,
   onChangeMonth,
+  onOpenDay,
 }: CalendarOverviewProps) {
   const calendarDays = getMonthCalendarDays(visibleMonth);
   const monthName = new Intl.DateTimeFormat("en-US", { month: "long" }).format(visibleMonth);
@@ -195,14 +198,22 @@ function CalendarOverview({
             const accessibleLabel = `${day.dayNumber}일, ${completedNames ? `${completedNames} 인증 완료` : "인증 없음"}`;
 
             return (
-              <div key={day.dateKey} className="calendar-day" data-today={day.dateKey === todayKey} role="group" aria-label={accessibleLabel}>
+              <button
+                key={day.dateKey}
+                type="button"
+                className="calendar-day"
+                data-today={day.dateKey === todayKey}
+                aria-label={`${accessibleLabel}, 인증 사진 보기`}
+                disabled={day.dateKey > todayKey}
+                onClick={() => onOpenDay(day.dateKey!)}
+              >
                 <span className="calendar-date">{day.dayNumber}</span>
                 <span className="calendar-stamps" aria-hidden="true">
                   {completedMembers.map((member) => (
                     <i key={member.id} style={{ "--stamp-color": member.accent } as CSSProperties} />
                   ))}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -211,9 +222,118 @@ function CalendarOverview({
   );
 }
 
+interface DayStampsProps {
+  certifications: CertificationMap;
+  dateKey: string;
+  onBack: () => void;
+  onSelectMember: (memberId: MemberId) => void;
+}
+
+function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStampsProps) {
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const dateLabel = formatKoreanDate(dateKey);
+  const entries = MEMBER_PROFILES.map((member) => {
+    const key = getCertificationKey(member.id, dateKey);
+    return { certification: certifications[key], key, member };
+  });
+  const doneCount = entries.filter((entry) => entry.certification).length;
+
+  useEffect(() => {
+    let isActive = true;
+    const createdUrls: string[] = [];
+
+    async function loadPhotos() {
+      const nextUrls: Record<string, string> = {};
+
+      for (const member of MEMBER_PROFILES) {
+        const key = getCertificationKey(member.id, dateKey);
+        const certification = certifications[key];
+
+        if (!certification) {
+          continue;
+        }
+
+        if (certification.photoPath) {
+          nextUrls[key] = getSharedPhotoUrl(certification.photoPath, certification.completedAt);
+          continue;
+        }
+
+        const photo = await getCertificationPhoto(key).catch(() => null);
+
+        if (photo) {
+          const url = URL.createObjectURL(photo);
+          createdUrls.push(url);
+          nextUrls[key] = url;
+        }
+      }
+
+      if (isActive) {
+        setPhotoUrls(nextUrls);
+      }
+    }
+
+    void loadPhotos();
+
+    return () => {
+      isActive = false;
+      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [certifications, dateKey]);
+
+  return (
+    <section className="stamp-sheet day-stamps" aria-labelledby="day-heading">
+      <div className="day-stamps-head">
+        <button type="button" className="day-back" aria-label="캘린더로 돌아가기" onClick={onBack}>
+          <ChevronLeftIcon aria-hidden="true" />
+        </button>
+        <div className="min-w-0">
+          <p className="calendar-eyebrow">Daily stamps</p>
+          <h2 id="day-heading" className="calendar-month">{dateLabel}</h2>
+        </div>
+        <p className="day-count" aria-label={`${MEMBER_PROFILES.length}명 중 ${doneCount}명 인증`}>
+          {doneCount} / {MEMBER_PROFILES.length}
+        </p>
+      </div>
+
+      <ul className="day-grid">
+        {entries.map(({ certification, key, member }) => (
+          <li
+            key={member.id}
+            className="day-card"
+            data-done={Boolean(certification)}
+            style={{ "--card-accent": member.accent, "--card-tint": member.accentSoft } as CSSProperties}
+          >
+            {certification && photoUrls[key] ? (
+              <div
+                className="day-photo"
+                style={{ backgroundImage: `url(${photoUrls[key]})` }}
+                role="img"
+                aria-label={`${member.name} ${dateLabel} 인증 사진`}
+              />
+            ) : (
+              <div className="day-photo day-photo-empty" aria-hidden="true">
+                <Image src={member.portrait} alt="" width={600} height={800} sizes="(max-width: 480px) 50vw, 220px" />
+              </div>
+            )}
+            <button type="button" className="day-card-meta" aria-label={`${member.name} 화면 열기`} onClick={() => onSelectMember(member.id)}>
+              <strong>{member.name}</strong>
+              <span>
+                {certification
+                  ? `${certification.routine} · ${formatStampTime(new Date(certification.completedAt), member.timeZone)}`
+                  : "도장 전"}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function SweatStampApp() {
   const usesSharedStorage = isSupabaseConfigured();
   const [activeView, setActiveView] = useState<AppView>("calendar");
+  const [openDay, setOpenDay] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<MemberId>("taem");
   const [visibleMonth, setVisibleMonth] = useState(() => getMonthStart(getLocalDateKey(new Date(), TEAM_TIME_ZONE)));
   const [now, setNow] = useState(() => new Date());
@@ -523,6 +643,7 @@ export function SweatStampApp() {
     selectedMemberIdRef.current = memberId;
     setSelectedMemberId(memberId);
     setActiveView(memberId);
+    setOpenDay(null);
     setPhotoPreview(null);
     setSaveError("");
   }
@@ -731,13 +852,23 @@ export function SweatStampApp() {
             data-selected={isCalendarView}
             aria-label="전체 캘린더"
             aria-pressed={isCalendarView}
-            onClick={() => setActiveView("calendar")}
+            onClick={() => {
+              setActiveView("calendar");
+              setOpenDay(null);
+            }}
           >
             <CalendarDaysIcon aria-hidden="true" />
           </button>
         </nav>
 
-        {isCalendarView ? (
+        {isCalendarView && openDay ? (
+          <DayStamps
+            certifications={certifications}
+            dateKey={openDay}
+            onBack={() => setOpenDay(null)}
+            onSelectMember={selectMember}
+          />
+        ) : isCalendarView ? (
           <>
             <section className="stamp-hero team-hero" aria-labelledby="team-heading">
               <div className="hero-copy">
@@ -804,6 +935,7 @@ export function SweatStampApp() {
               todayKey={teamTodayKey}
               visibleMonth={visibleMonth}
               onChangeMonth={(offset) => setVisibleMonth((currentMonth) => shiftMonth(currentMonth, offset))}
+              onOpenDay={setOpenDay}
             />
           </>
         ) : (

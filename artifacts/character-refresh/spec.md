@@ -42,6 +42,11 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 - Below the greeting, the four characters from `team_lineup.png` stand in a row. Characters who certified today are shown in full color, the others are faded, and tapping a character opens that member's screen. Each character shows their count for the month shown in the calendar below, so the counts follow `이전 달` and `다음 달`.
 - The month grid starts on Monday, shows only the weeks it needs, and marks each day with a dot per certified member. There is no separate per-member list.
 
+### S8. Daily stamps page
+- Tapping a past or current day in the calendar opens a page titled with that day (`11월 14일 토요일`), with a back button (`캘린더로 돌아가기`) and `<done> / 4`.
+- Each member has a card: their stamped photo (`<NAME> <day> 인증 사진`) with `<workout> · <time>` in their own time zone, or their faded portrait filling the card with `도장 전`. Tapping a name opens that member's screen.
+- Future days cannot be opened.
+
 ### S6. App icon and share image
 - The app icon, Apple touch icon, and PWA manifest icons use the four-character face image.
 - Link previews use the four-character workout image.

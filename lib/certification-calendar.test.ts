@@ -4,6 +4,7 @@ import {
   WEEKDAY_LABELS,
   countCertificationsInMonth,
   formatDayLabel,
+  formatKoreanDate,
   getCertificationKey,
   getMonthStart,
   parseCertificationKey,
@@ -95,5 +96,10 @@ describe("certification calendar", () => {
     const start = getMonthStart("2026-11-14");
 
     expect([start.getFullYear(), start.getMonth(), start.getDate()]).toEqual([2026, 10, 1]);
+  });
+
+  it("labels a day in Korean for the daily stamps page", () => {
+    expect(formatKoreanDate("2026-11-14")).toBe("11월 14일 토요일");
+    expect(formatKoreanDate("2027-01-03")).toBe("1월 3일 일요일");
   });
 });

@@ -229,3 +229,25 @@ test("a picked photo is stamped and certifies today", async ({ page }) => {
   await expect(page.getByText("남은 세 명도 같이 가 볼까요?")).toBeVisible();
   await expect(page.getByRole("button", { name: `TAEM 오늘 인증 완료, ${seoulDatePart("month")}월 1회, 인증 화면 열기` })).toBeVisible();
 });
+
+test("a calendar day opens everyone's stamps for that day", async ({ page }) => {
+  await page.getByRole("button", { name: /^YOOM 선택/ }).click();
+  await page.getByRole("button", { name: /도장 찍기$/ }).click();
+  await expect(page.getByRole("heading", { name: "오늘도 해냈어요." })).toBeVisible();
+  await page.getByRole("button", { name: "전체 캘린더" }).click();
+
+  const dayLabel = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", weekday: "long" }).format(new Date());
+  await page.getByRole("button", { name: `${seoulDatePart("day")}일, YOOM 인증 완료, 인증 사진 보기` }).click();
+
+  await expect(page.getByRole("heading", { name: dayLabel })).toBeVisible();
+  await expect(page.getByLabel("4명 중 1명 인증")).toBeVisible();
+  await expect(page.getByRole("img", { name: `YOOM ${dayLabel} 인증 사진` })).toBeVisible();
+  await expect(page.getByRole("button", { name: "TAEM 화면 열기" })).toContainText("도장 전");
+
+  await page.getByRole("button", { name: "캘린더로 돌아가기" }).click();
+  await expect(page.getByLabel("도장 캘린더")).toBeVisible();
+
+  await page.getByRole("button", { name: `${seoulDatePart("day")}일, YOOM 인증 완료, 인증 사진 보기` }).click();
+  await page.getByRole("button", { name: "YOOM 화면 열기" }).click();
+  await expect(page.getByRole("heading", { name: "오늘도 해냈어요." })).toBeVisible();
+});
