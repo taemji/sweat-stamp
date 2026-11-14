@@ -138,6 +138,27 @@ function pickDeviceCertifications(certifications: CertificationMap): Certificati
   return Object.fromEntries(Object.entries(certifications).filter(([, certification]) => !certification.photoPath));
 }
 
+interface CertificationPhotoUrl {
+  url: string;
+  isObjectUrl: boolean;
+}
+
+// Shared photos have a public URL; photos kept on the device are read from IndexedDB.
+async function loadCertificationPhotoUrl(key: string, certification: Certification): Promise<CertificationPhotoUrl | null> {
+  if (certification.photoPath) {
+    return { url: getSharedPhotoUrl(certification.photoPath, certification.completedAt), isObjectUrl: false };
+  }
+
+  const photo = await getCertificationPhoto(key).catch(() => null);
+  return photo ? { url: URL.createObjectURL(photo), isObjectUrl: true } : null;
+}
+
+function releasePhotoUrl(photoUrl: CertificationPhotoUrl | null | undefined) {
+  if (photoUrl?.isObjectUrl) {
+    URL.revokeObjectURL(photoUrl.url);
+  }
+}
+
 function stampPhotoForMember(member: MemberProfile, photo: File, stampedAt: Date) {
   return createStampedPhoto(photo, {
     accent: member.accent,
@@ -204,7 +225,7 @@ function CalendarOverview({
                 className="calendar-day"
                 data-today={day.dateKey === todayKey}
                 aria-label={`${accessibleLabel}, 인증 사진 보기`}
-                disabled={day.dateKey > todayKey}
+                disabled={day.dateKey > todayKey && completedMembers.length === 0}
                 onClick={() => onOpenDay(day.dateKey!)}
               >
                 <span className="calendar-date">{day.dayNumber}</span>
@@ -231,6 +252,7 @@ interface DayStampsProps {
 
 function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStampsProps) {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const photoCacheRef = useRef(new Map<string, CertificationPhotoUrl & { signature: string }>());
   const dateLabel = formatKoreanDate(dateKey);
   const entries = MEMBER_PROFILES.map((member) => {
     const key = getCertificationKey(member.id, dateKey);
@@ -240,10 +262,11 @@ function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStamp
 
   useEffect(() => {
     let isActive = true;
-    const createdUrls: string[] = [];
+    const cache = photoCacheRef.current;
 
     async function loadPhotos() {
       const nextUrls: Record<string, string> = {};
+      const shownKeys = new Set<string>();
 
       for (const member of MEMBER_PROFILES) {
         const key = getCertificationKey(member.id, dateKey);
@@ -253,17 +276,35 @@ function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStamp
           continue;
         }
 
-        if (certification.photoPath) {
-          nextUrls[key] = getSharedPhotoUrl(certification.photoPath, certification.completedAt);
-          continue;
+        const signature = `${certification.completedAt}|${certification.photoPath ?? ""}`;
+        let cached = cache.get(key);
+        shownKeys.add(key);
+
+        if (!cached || cached.signature !== signature) {
+          releasePhotoUrl(cached);
+          cache.delete(key);
+          const photoUrl = await loadCertificationPhotoUrl(key, certification);
+
+          if (!isActive) {
+            releasePhotoUrl(photoUrl);
+            return;
+          }
+
+          if (!photoUrl) {
+            continue;
+          }
+
+          cached = { ...photoUrl, signature };
+          cache.set(key, cached);
         }
 
-        const photo = await getCertificationPhoto(key).catch(() => null);
+        nextUrls[key] = cached.url;
+      }
 
-        if (photo) {
-          const url = URL.createObjectURL(photo);
-          createdUrls.push(url);
-          nextUrls[key] = url;
+      for (const [key, cached] of cache) {
+        if (!shownKeys.has(key)) {
+          releasePhotoUrl(cached);
+          cache.delete(key);
         }
       }
 
@@ -276,9 +317,17 @@ function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStamp
 
     return () => {
       isActive = false;
-      createdUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [certifications, dateKey]);
+
+  useEffect(() => {
+    const cache = photoCacheRef.current;
+
+    return () => {
+      cache.forEach((cached) => releasePhotoUrl(cached));
+      cache.clear();
+    };
+  }, []);
 
   return (
     <section className="stamp-sheet day-stamps" aria-labelledby="day-heading">
@@ -311,16 +360,16 @@ function DayStamps({ certifications, dateKey, onBack, onSelectMember }: DayStamp
                 aria-label={`${member.name} ${dateLabel} 인증 사진`}
               />
             ) : (
-              <div className="day-photo day-photo-empty" aria-hidden="true">
+              <div className="day-photo day-photo-empty" data-done={Boolean(certification)} aria-hidden="true">
                 <Image src={member.portrait} alt="" width={600} height={800} sizes="(max-width: 480px) 50vw, 220px" />
               </div>
             )}
-            <button type="button" className="day-card-meta" aria-label={`${member.name} 화면 열기`} onClick={() => onSelectMember(member.id)}>
+            <button type="button" className="day-card-meta" aria-label={`${member.name} 화면 열기, ${certification ? "인증 완료" : "아직 인증 전"}`} onClick={() => onSelectMember(member.id)}>
               <strong>{member.name}</strong>
               <span>
                 {certification
                   ? `${certification.routine} · ${formatStampTime(new Date(certification.completedAt), member.timeZone)}`
-                  : "도장 전"}
+                  : "Not yet"}
               </span>
             </button>
           </li>
@@ -504,47 +553,26 @@ export function SweatStampApp() {
   }, [photoPreview]);
 
   useEffect(() => {
-    let photoUrl = "";
+    let loadedPhoto: CertificationPhotoUrl | null = null;
     let isActive = true;
 
     if (!completedCertification) {
       return;
     }
 
-    if (completedCertification.photoPath) {
-      const remotePhotoUrl = getSharedPhotoUrl(completedCertification.photoPath, completedCertification.completedAt);
-      void Promise.resolve().then(() => {
-        if (isActive) {
-          setStoredPhoto({ key: completedPhotoKey, url: remotePhotoUrl });
-        }
-      });
+    void loadCertificationPhotoUrl(certificationKey, completedCertification).then((photoUrl) => {
+      if (!isActive) {
+        releasePhotoUrl(photoUrl);
+        return;
+      }
 
-      return () => {
-        isActive = false;
-      };
-    }
-
-    void getCertificationPhoto(certificationKey)
-      .then((photo) => {
-        if (!photo || !isActive) {
-          return;
-        }
-
-        photoUrl = URL.createObjectURL(photo);
-        setStoredPhoto({ key: completedPhotoKey, url: photoUrl });
-      })
-      .catch(() => {
-        if (isActive) {
-          setStoredPhoto(null);
-        }
-      });
+      loadedPhoto = photoUrl;
+      setStoredPhoto(photoUrl ? { key: completedPhotoKey, url: photoUrl.url } : null);
+    });
 
     return () => {
       isActive = false;
-
-      if (photoUrl) {
-        URL.revokeObjectURL(photoUrl);
-      }
+      releasePhotoUrl(loadedPhoto);
     };
   }, [certificationKey, completedCertification, completedPhotoKey]);
 

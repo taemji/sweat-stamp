@@ -242,7 +242,7 @@ test("a calendar day opens everyone's stamps for that day", async ({ page }) => 
   await expect(page.getByRole("heading", { name: dayLabel })).toBeVisible();
   await expect(page.getByLabel("4명 중 1명 인증")).toBeVisible();
   await expect(page.getByRole("img", { name: `YOOM ${dayLabel} 인증 사진` })).toBeVisible();
-  await expect(page.getByRole("button", { name: "TAEM 화면 열기" })).toContainText("도장 전");
+  await expect(page.getByRole("button", { name: "TAEM 화면 열기" })).toContainText("Not yet");
 
   await page.getByRole("button", { name: "캘린더로 돌아가기" }).click();
   await expect(page.getByLabel("도장 캘린더")).toBeVisible();

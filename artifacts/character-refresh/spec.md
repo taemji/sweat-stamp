@@ -42,11 +42,6 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 - Below the greeting, the four characters from `team_lineup.png` stand in a row. Characters who certified today are shown in full color, the others are faded, and tapping a character opens that member's screen. Each character shows their count for the month shown in the calendar below, so the counts follow `이전 달` and `다음 달`.
 - The month grid starts on Monday, shows only the weeks it needs, and marks each day with a dot per certified member. There is no separate per-member list.
 
-### S8. Daily stamps page
-- Tapping a past or current day in the calendar opens a page titled with that day (`11월 14일 토요일`), with a back button (`캘린더로 돌아가기`) and `<done> / 4`.
-- Each member has a card: their stamped photo (`<NAME> <day> 인증 사진`) with `<workout> · <time>` in their own time zone, or their faded portrait filling the card with `도장 전`. Tapping a name opens that member's screen.
-- Future days cannot be opened.
-
 ### S6. App icon and share image
 - The app icon, Apple touch icon, and PWA manifest icons use the four-character face image.
 - Link previews use the four-character workout image.
@@ -58,6 +53,11 @@ The shared calendar uses a cream team theme and the four-character lineup illust
 - The workout date is the member's date at the time on the stamp, so the photo and the record always agree.
 - `다시 인증` on a shared certification is refused with `인터넷에 다시 연결된 뒤 시도해 주세요.` while shared storage is unreachable.
 - Stamp times read like `오전 6:33`, on the photo and in `<time>에 찍은 도장`.
+
+### S8. Daily stamps page
+- Tapping a past or current day in the calendar opens a page titled with that day (`11월 14일 토요일`), with a back button (`캘린더로 돌아가기`) and `<done> / 4`.
+- Each member has a card: their stamped photo (`<NAME> <day> 인증 사진`) with `<workout> · <time>` in their own time zone, or their faded portrait filling the card with `Not yet`. Tapping a name opens that member's screen.
+- Future days cannot be opened.
 
 ## Success Criteria
 

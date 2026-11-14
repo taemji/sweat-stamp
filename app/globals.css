@@ -930,7 +930,11 @@
     height: 100%;
     object-fit: cover;
     object-position: center 20%;
-    opacity: 0.55;
+    opacity: 0.32;
+  }
+
+  .day-photo-empty[data-done="true"] img {
+    opacity: 1;
   }
 
   .day-card-meta {
